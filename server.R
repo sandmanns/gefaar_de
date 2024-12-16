@@ -1,0 +1,6050 @@
+library(shiny)
+library(pheatmap)
+library(DT)
+library(NbClust)
+library(M3C)
+library(ggplot2)
+library(openxlsx)
+library(shinyWidgets)
+#library(gridExtra)
+#library(grid)
+Sys.setlocale("LC_CTYPE", "")
+
+shinyServer(function(input, output, session) {
+  output$text_analyse1<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse1a<-renderText({"Heatmap sortiert (Klinik/Fachbereich, Resistenz)"})
+  output$text_analyse2<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse2a<-renderText({"Heatmap sortiert (Klinik/Fachbereich, Datum)"})
+  output$text_analyse3<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse3a<-renderText({"Heatmap Clustering (hierarchisch)"})
+  output$text_analyse4<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse4a<-renderText({"UMAP (eingefärbte Kliniken/Fachbereiche)"})
+  output$text_analyse5<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse5a<-renderText({"UMAP (eingefärbte Cluster)"})
+  output$text_analyse6<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse6a<-renderText({"Zusätzliche Heatmap sortiert (UMAP-Cluster)"})
+  output$text_analyse6b<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse6ab<-renderText({"Zusätzliche Heatmap sortiert (Kliniken/Fachbereiche)"})
+  
+  output$text_analyse7<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse7a<-renderText({"Heatmap sortiert (Spezies)"})
+  output$text_analyse8<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_analyse8a<-renderText({"Heatmap Clustering (hierarchisch)"})
+  
+  output$text_zusammenfassung0<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_zusammenfassung02<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_zusammenfassung0b<-renderText({"Resistenzstatistik: Datenblatt Antibiotika"})
+  output$text_zusammenfassung0c<-renderText({NULL})  
+  output$hinweis_tabellen<-renderText({"Hinweis: Werden alle Spezies gleichzeitig analysiert, kann es bis zu 30 Sekunden dauern, bis die aktualisierten Tabellen angezeigt werden."})
+  output$hinweis_tabellen_trend<-renderText({NULL})
+  
+  output$text_zusammenfassung0b2<-renderText({"Resistenzstatistik: Grafiken Antibiotika"})
+  output$text_zusammenfassung0c2<-renderText({NULL})
+  output$hinweis_abb<-renderText({"Hinweis: Werden alle Spezies gleichzeitig analysiert, kann es bis zu 30 Sekunden dauern, bis die aktualisierten Plots angezeigt werden."})
+  
+  output$text_erregerstat1<-renderText({"Erregerstatistik"})
+  output$text_erregerstat2<-renderText({"Analyse noch nicht durchgeführt"})
+  
+  output$text_trend1<-renderText({"Trend-Analyse"})
+  output$text_trend2<-renderText({"Analyse noch nicht durchgeführt"})
+  
+  output$text_zusammenfassung1b<-renderText({"Zusammenfassung Kliniken/Fachbereiche"})
+  output$text_zusammenfassung1<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_zusammenfassung0c3<-renderText({NULL})
+  output$text_zusammenfassung2b<-renderText({"Zusammenfassung Antibiotika"})
+  output$text_zusammenfassung2<-renderText({"Analyse noch nicht durchgeführt"})
+  output$text_zusammenfassung0c4<-renderText({NULL})
+
+  output$text_info2h<-renderText({"Die Zweckbestimmung dieser Anwendung ist eine Auswertungsübersicht über retrospektive Resistenzdaten.
+Die Anwendung ist kein Medizinprodukt nach Medizinproduktegesetz oder EU-Medical Device Regulation."})
+  output$text_info1<-renderText({"Entwickelt von"})
+  output$text_info2a<-renderText({"Priv.-Doz. Dr. rer. medic. Sarah Sandmann"})
+  output$text_info1b<-renderText({"Kontakt:"})
+  output$text_info2c<-renderText({"sarah.sandmann@uni-muenster.de"})
+  output$text_info2d<-renderText({"Bitte zitieren als:"})
+  output$text_info2b<-renderText({"Sandmann et al. GEFAAR: a generic framework for the analysis of antimicrobial resistance providing statistics and cluster analyses. 
+Sci Rep. 2023 Oct 7;13(1):16922. doi: 10.1038/s41598-023-44109-3. "})
+  output$text_info2g<-renderText({"Letzte Änderung: 09.12.2024"})
+
+  
+   #input2<-read.table("www/Daten_2020-2023_neu_light.txt",
+  #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+
+   output$anweisung0pre<-renderText({"Bitte lesen Sie zuerst einen File ein und konfigurieren Sie den Input"})
+   output$anweisung1pre<-renderText({"Bitte lesen Sie zuerst einen File ein und konfigurieren Sie den Input"})
+   output$anweisung2pre<-renderText({"Bitte lesen Sie zuerst einen File ein und konfigurieren Sie den Input"})
+   output$anweisung3pre<-renderText({"Bitte lesen Sie zuerst einen File ein und konfigurieren Sie den Input"})
+   output$anweisung4pre<-renderText({"Bitte lesen Sie zuerst einen File ein und konfigurieren Sie den Input"})
+   
+   output$inputFileUI<-renderUI({
+     if(input$ownData=="Eigene Daten einlesen"){
+       fileInput('inputFile',label = "File einlesen")
+     }else{
+       NULL
+     }
+   })
+   output$sepInputUI<-renderUI({
+     if(input$ownData=="Eigene Daten einlesen"){
+       radioButtons('sepInput',label = "Trennzeichen Input File",
+                    choices = c("Komma","Semikolon","Tab"),selected = character(0),
+                    inline = T)
+     }else{
+       NULL
+     }
+   })
+   
+   
+   observeEvent(input$do_clear,{
+     session$reload()
+     
+   })
+   
+   
+   
+   observeEvent(input$do_in,{
+     if(input$ownData=="Demo Daten laden"){
+       shinyjs::html("text", paste0("<br>Demo Daten werden generiert.<br><br>"), add = FALSE)
+       
+       ###########2021
+       erreger<-"Escherichia coli"
+       number<-1000
+       temp3<-data.frame(Ampicillin=c(rep("-",8),rep("R",827),rep("S",212)),
+                         Amoxicillin=c(rep("-",314),rep("R",690),rep("S",43)),
+                         Cefepime=c(rep("-",6),rep("R",354),rep("S",581),rep("I",106)),
+                         Ciprofloxacin=c(rep("-",6),rep("R",354),rep("S",581),rep("I",106)),
+                         Erythromycin=c(rep("-",1047)),
+                         Gentamycin=c(rep("-",576),rep("R",64),rep("S",407)),
+                         Meropenem=c(rep("-",3),rep("R",1),rep("S",1043)),
+                         Piperacillin=c(rep("-",827),rep("R",124),rep("S",96)),
+                         Tigecycline=c(rep("-",636),rep("R",50),rep("S",361)),
+                         Vancomycin=c(rep("-",1047)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(5,7,11,1,4,8,64))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       
+       input_sim1a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2021/01/01')+sample(0:364,size = number,replace = T))
+       input_sim1b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim1<-cbind(input_sim1a,input_sim1b)
+       
+       
+       erreger<-"Staphylococcus aureus"
+       number<-800
+       temp3<-data.frame(Ampicillin=c(rep("-",198),rep("R",1)),
+                         Amoxicillin=c(rep("-",198),rep("R",1)),
+                         Cefepime=c(rep("-",199)),
+                         Ciprofloxacin=c(rep("-",159),rep("R",40)),
+                         Erythromycin=c(rep("-",14),rep("R",81),rep("S",100),rep("I",4)),
+                         Gentamycin=c(rep("-",16),rep("R",33),rep("S",150)),
+                         Meropenem=c(rep("-",37),rep("R",47),rep("S",115)),
+                         Piperacillin=c(rep("-",33),rep("R",119),rep("S",47)),
+                         Tigecycline=c(rep("-",23),rep("R",1),rep("S",175)),
+                         Vancomycin=c(rep("-",15),rep("R",2),rep("S",182)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(5,20,22,2,3,43,5))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim2a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2021/01/01')+sample(0:364,size = number,replace = T))
+       input_sim2b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim2<-cbind(input_sim2a,input_sim2b)
+       
+       
+       erreger<-"Staphylococcus epidermidis"
+       number<-600
+       temp3<-data.frame(Ampicillin=c(rep("-",499),rep("R",1)),
+                         Amoxicillin=c(rep("-",500)),
+                         Cefepime=c(rep("-",500)),
+                         Ciprofloxacin=c(rep("-",236),rep("R",264)),
+                         Erythromycin=c(rep("-",16),rep("R",331),rep("S",153)),
+                         Gentamycin=c(rep("-",35),rep("R",207),rep("S",258)),
+                         Meropenem=c(rep("-",45),rep("R",343),rep("S",112)),
+                         Piperacillin=c(rep("-",157),rep("R",343)),
+                         Tigecycline=c(rep("-",35),rep("R",5),rep("S",460)),
+                         Vancomycin=c(rep("-",39),rep("S",461)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(22,0,41,15,7,14,1))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim3a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2021/01/01')+sample(0:364,size = number,replace = T))
+       input_sim3b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim3<-cbind(input_sim3a,input_sim3b)
+       
+       
+       
+       erreger<-"Pseudomonas aeruginosa"
+       number<-400
+       temp3<-data.frame(Ampicillin=c(rep("-",200)),
+                         Amoxicillin=c(rep("-",200)),
+                         Cefepime=c(rep("-",29),rep("R",60),rep("S",1),rep("I",110)),
+                         Ciprofloxacin=c(rep("-",4),rep("R",84),rep("S",1),rep("I",111)),
+                         Erythromycin=c(rep("-",200)),
+                         Gentamycin=c(rep("-",190),rep("R",6),rep("S",4)),
+                         Meropenem=c(rep("-",8),rep("R",63),rep("S",84),rep("I",45)),
+                         Piperacillin=c(rep("-",168),rep("R",19),rep("I",13)),
+                         Tigecycline=c(rep("-",199),rep("R",1)),
+                         Vancomycin=c(rep("-",200)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(3,18,15,2,3,29,30))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim4a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2021/01/01')+sample(0:364,size = number,replace = T))
+       input_sim4b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim4<-cbind(input_sim4a,input_sim4b)
+       
+       
+       
+       erreger<-"Enterococcus faecalis"
+       number<-100
+       temp3<-data.frame(Ampicillin=c(rep("-",1),rep("I",1),rep("R",8),rep("S",48)),
+                         Amoxicillin=c(rep("-",23),rep("R",4),rep("S",31)),
+                         Cefepime=c(rep("-",58)),
+                         Ciprofloxacin=c(rep("-",27),rep("R",5),rep("S",26)),
+                         Erythromycin=c(rep("-",58)),
+                         Gentamycin=c(rep("-",58)),
+                         Meropenem=c(rep("-",58)),
+                         Piperacillin=c(rep("-",5),rep("R",7),rep("S",46)),
+                         Tigecycline=c(rep("-",4),rep("S",54)),
+                         Vancomycin=c(rep("-",58)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(4,0,30,4,12,8,42))
+       
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim5a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2021/01/01')+sample(0:364,size = number,replace = T))
+       input_sim5b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim5<-cbind(input_sim5a,input_sim5b)
+       
+       input_sim<-rbind(input_sim1,input_sim2,input_sim3,input_sim4,input_sim5)
+       
+       
+       
+       
+       input_sim_b<-input_sim[,c(1:4,which(as.numeric(colSums(input_sim[,c(5:14)]=="-"))!=2900)+4)]
+       
+       input_sim_b<-input_sim_b[order(input_sim_b$Klinik,input_sim_b$Datum),]
+       names(input_sim_b)[1:4]<-c("Spezies","Material","Klinik","Datum")
+       
+       input_sim_2021<-input_sim_b[,c(1,3,2,4:14)]
+       input_sim_2021<-cbind(input_sim_2021[,c(1:4)],Isolat=sample(x = c(0,1),size = nrow(input_sim_2021),
+                                                                     replace = T,prob = c(0.05,0.95)),
+                             input_sim_2021[,c(5:14)])
+       
+       
+       
+       
+       
+       
+       ############2022
+       erreger<-"Escherichia coli"
+       number<-1050
+       temp3<-data.frame(Ampicillin=c(rep("-",8),rep("R",827),rep("S",212)),
+                         Amoxicillin=c(rep("-",314),rep("R",690),rep("S",43)),
+                         Cefepime=c(rep("-",6),rep("R",354),rep("S",581),rep("I",106)),
+                         Ciprofloxacin=c(rep("-",6),rep("R",354),rep("S",581),rep("I",106)),
+                         Erythromycin=c(rep("-",1047)),
+                         Gentamycin=c(rep("-",576),rep("R",64),rep("S",407)),
+                         Meropenem=c(rep("-",3),rep("R",1),rep("S",1043)),
+                         Piperacillin=c(rep("-",827),rep("R",124),rep("S",96)),
+                         Tigecycline=c(rep("-",636),rep("R",50),rep("S",361)),
+                         Vancomycin=c(rep("-",1047)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(5,7,11,1,4,8,64))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       
+       input_sim1a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2022/01/01')+sample(0:364,size = number,replace = T))
+       input_sim1b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim1<-cbind(input_sim1a,input_sim1b)
+       
+       
+       erreger<-"Staphylococcus aureus"
+       number<-850
+       temp3<-data.frame(Ampicillin=c(rep("-",198),rep("R",1)),
+                         Amoxicillin=c(rep("-",198),rep("R",1)),
+                         Cefepime=c(rep("-",199)),
+                         Ciprofloxacin=c(rep("-",159),rep("R",40)),
+                         Erythromycin=c(rep("-",14),rep("R",81),rep("S",100),rep("I",4)),
+                         Gentamycin=c(rep("-",16),rep("R",33),rep("S",150)),
+                         Meropenem=c(rep("-",37),rep("R",47),rep("S",115)),
+                         Piperacillin=c(rep("-",33),rep("R",119),rep("S",47)),
+                         Tigecycline=c(rep("-",23),rep("R",1),rep("S",175)),
+                         Vancomycin=c(rep("-",15),rep("R",2),rep("S",182)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(5,20,22,2,3,43,5))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim2a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2022/01/01')+sample(0:364,size = number,replace = T))
+       input_sim2b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim2<-cbind(input_sim2a,input_sim2b)
+       
+       
+       erreger<-"Staphylococcus epidermidis"
+       number<-550
+       temp3<-data.frame(Ampicillin=c(rep("-",499),rep("R",1)),
+                         Amoxicillin=c(rep("-",500)),
+                         Cefepime=c(rep("-",500)),
+                         Ciprofloxacin=c(rep("-",236),rep("R",264)),
+                         Erythromycin=c(rep("-",16),rep("R",331),rep("S",153)),
+                         Gentamycin=c(rep("-",35),rep("R",207),rep("S",258)),
+                         Meropenem=c(rep("-",45),rep("R",343),rep("S",112)),
+                         Piperacillin=c(rep("-",157),rep("R",343)),
+                         Tigecycline=c(rep("-",35),rep("R",5),rep("S",460)),
+                         Vancomycin=c(rep("-",39),rep("S",461)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(22,0,41,15,7,14,1))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim3a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2022/01/01')+sample(0:364,size = number,replace = T))
+       input_sim3b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim3<-cbind(input_sim3a,input_sim3b)
+       
+       
+       
+       erreger<-"Pseudomonas aeruginosa"
+       number<-350
+       temp3<-data.frame(Ampicillin=c(rep("-",200)),
+                         Amoxicillin=c(rep("-",200)),
+                         Cefepime=c(rep("-",29),rep("R",60),rep("S",1),rep("I",110)),
+                         Ciprofloxacin=c(rep("-",4),rep("R",84),rep("S",1),rep("I",111)),
+                         Erythromycin=c(rep("-",200)),
+                         Gentamycin=c(rep("-",190),rep("R",6),rep("S",4)),
+                         Meropenem=c(rep("-",8),rep("R",63),rep("S",84),rep("I",45)),
+                         Piperacillin=c(rep("-",168),rep("R",19),rep("I",13)),
+                         Tigecycline=c(rep("-",199),rep("R",1)),
+                         Vancomycin=c(rep("-",200)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(3,18,15,2,3,29,30))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim4a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2022/01/01')+sample(0:364,size = number,replace = T))
+       input_sim4b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim4<-cbind(input_sim4a,input_sim4b)
+       
+       
+       
+       erreger<-"Enterococcus faecalis"
+       number<-120
+       temp3<-data.frame(Ampicillin=c(rep("-",1),rep("I",1),rep("R",8),rep("S",48)),
+                         Amoxicillin=c(rep("-",23),rep("R",4),rep("S",31)),
+                         Cefepime=c(rep("-",58)),
+                         Ciprofloxacin=c(rep("-",27),rep("R",5),rep("S",26)),
+                         Erythromycin=c(rep("-",58)),
+                         Gentamycin=c(rep("-",58)),
+                         Meropenem=c(rep("-",58)),
+                         Piperacillin=c(rep("-",5),rep("R",7),rep("S",46)),
+                         Tigecycline=c(rep("-",4),rep("S",54)),
+                         Vancomycin=c(rep("-",58)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(4,0,30,4,12,8,42))
+       
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim5a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2022/01/01')+sample(0:364,size = number,replace = T))
+       input_sim5b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim5<-cbind(input_sim5a,input_sim5b)
+       
+       input_sim<-rbind(input_sim1,input_sim2,input_sim3,input_sim4,input_sim5)
+       
+       
+       
+       
+       input_sim_b<-input_sim[,c(1:4,which(as.numeric(colSums(input_sim[,c(5:14)]=="-"))!=2900)+4)]
+       
+       input_sim_b<-input_sim_b[order(input_sim_b$Klinik,input_sim_b$Datum),]
+       names(input_sim_b)[1:4]<-c("Spezies","Material","Klinik","Datum")
+       
+       input_sim_2022<-input_sim_b[,c(1,3,2,4:14)]
+       input_sim_2022<-cbind(input_sim_2022[,c(1:4)],Isolat=sample(x = c(0,1),size = nrow(input_sim_2022),
+                                                                     replace = T,prob = c(0.05,0.95)),
+                             input_sim_2022[,c(5:14)])
+       
+       
+       
+       
+       
+       
+       ############2020
+       erreger<-"Escherichia coli"
+       number<-950
+       temp3<-data.frame(Ampicillin=c(rep("-",8),rep("R",827),rep("S",212)),
+                         Amoxicillin=c(rep("-",314),rep("R",690),rep("S",43)),
+                         Cefepime=c(rep("-",6),rep("R",354),rep("S",581),rep("I",106)),
+                         Ciprofloxacin=c(rep("-",6),rep("R",354),rep("S",581),rep("I",106)),
+                         Erythromycin=c(rep("-",1047)),
+                         Gentamycin=c(rep("-",576),rep("R",64),rep("S",407)),
+                         Meropenem=c(rep("-",3),rep("R",1),rep("S",1043)),
+                         Piperacillin=c(rep("-",827),rep("R",124),rep("S",96)),
+                         Tigecycline=c(rep("-",636),rep("R",50),rep("S",361)),
+                         Vancomycin=c(rep("-",1047)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(5,7,11,1,4,8,64))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       
+       input_sim1a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2020/01/01')+sample(0:364,size = number,replace = T))
+       input_sim1b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim1<-cbind(input_sim1a,input_sim1b)
+       
+       
+       erreger<-"Staphylococcus aureus"
+       number<-750
+       temp3<-data.frame(Ampicillin=c(rep("-",198),rep("R",1)),
+                         Amoxicillin=c(rep("-",198),rep("R",1)),
+                         Cefepime=c(rep("-",199)),
+                         Ciprofloxacin=c(rep("-",159),rep("R",40)),
+                         Erythromycin=c(rep("-",14),rep("R",81),rep("S",100),rep("I",4)),
+                         Gentamycin=c(rep("-",16),rep("R",33),rep("S",150)),
+                         Meropenem=c(rep("-",37),rep("R",47),rep("S",115)),
+                         Piperacillin=c(rep("-",33),rep("R",119),rep("S",47)),
+                         Tigecycline=c(rep("-",23),rep("R",1),rep("S",175)),
+                         Vancomycin=c(rep("-",15),rep("R",2),rep("S",182)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(5,20,22,2,3,43,5))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim2a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2020/01/01')+sample(0:364,size = number,replace = T))
+       input_sim2b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim2<-cbind(input_sim2a,input_sim2b)
+       
+       
+       erreger<-"Staphylococcus epidermidis"
+       number<-650
+       temp3<-data.frame(Ampicillin=c(rep("-",499),rep("R",1)),
+                         Amoxicillin=c(rep("-",500)),
+                         Cefepime=c(rep("-",500)),
+                         Ciprofloxacin=c(rep("-",236),rep("R",264)),
+                         Erythromycin=c(rep("-",16),rep("R",331),rep("S",153)),
+                         Gentamycin=c(rep("-",35),rep("R",207),rep("S",258)),
+                         Meropenem=c(rep("-",45),rep("R",343),rep("S",112)),
+                         Piperacillin=c(rep("-",157),rep("R",343)),
+                         Tigecycline=c(rep("-",35),rep("R",5),rep("S",460)),
+                         Vancomycin=c(rep("-",39),rep("S",461)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(22,0,41,15,7,14,1))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim3a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2020/01/01')+sample(0:364,size = number,replace = T))
+       input_sim3b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim3<-cbind(input_sim3a,input_sim3b)
+       
+       
+       
+       erreger<-"Pseudomonas aeruginosa"
+       number<-450
+       temp3<-data.frame(Ampicillin=c(rep("-",200)),
+                         Amoxicillin=c(rep("-",200)),
+                         Cefepime=c(rep("-",29),rep("R",60),rep("S",1),rep("I",110)),
+                         Ciprofloxacin=c(rep("-",4),rep("R",84),rep("S",1),rep("I",111)),
+                         Erythromycin=c(rep("-",200)),
+                         Gentamycin=c(rep("-",190),rep("R",6),rep("S",4)),
+                         Meropenem=c(rep("-",8),rep("R",63),rep("S",84),rep("I",45)),
+                         Piperacillin=c(rep("-",168),rep("R",19),rep("I",13)),
+                         Tigecycline=c(rep("-",199),rep("R",1)),
+                         Vancomycin=c(rep("-",200)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(3,18,15,2,3,29,30))
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim4a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2020/01/01')+sample(0:364,size = number,replace = T))
+       input_sim4b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim4<-cbind(input_sim4a,input_sim4b)
+       
+       
+       
+       erreger<-"Enterococcus faecalis"
+       number<-80
+       temp3<-data.frame(Ampicillin=c(rep("-",1),rep("I",1),rep("R",8),rep("S",48)),
+                         Amoxicillin=c(rep("-",23),rep("R",4),rep("S",31)),
+                         Cefepime=c(rep("-",58)),
+                         Ciprofloxacin=c(rep("-",27),rep("R",5),rep("S",26)),
+                         Erythromycin=c(rep("-",58)),
+                         Gentamycin=c(rep("-",58)),
+                         Meropenem=c(rep("-",58)),
+                         Piperacillin=c(rep("-",5),rep("R",7),rep("S",46)),
+                         Tigecycline=c(rep("-",4),rep("S",54)),
+                         Vancomycin=c(rep("-",58)))
+       
+       temp_material<-data.frame(Var1=c("Blutkultur","Tiefes respiratorisches Sekret","Tiefer Abstrich/Gewebe","Fremdkörper",
+                                        "Punktat/Sekret","Oberflächlicher Abstrich","Urin"),
+                                 Freq=c(4,0,30,4,12,8,42))
+       
+       material<-as.character(c(rep(temp_material[1,1],temp_material[1,2]),
+                                rep(temp_material[2,1],temp_material[2,2]),
+                                rep(temp_material[3,1],temp_material[3,2]),
+                                rep(temp_material[4,1],temp_material[4,2]),
+                                rep(temp_material[5,1],temp_material[5,2]),
+                                rep(temp_material[6,1],temp_material[6,2]),
+                                rep(temp_material[7,1],temp_material[7,2])))
+       input_sim5a<-data.frame(Erreger=rep(erreger,number),
+                               Material=material[round(runif(n=number,min=0.5,max=100.49))],
+                               Klinik=c(paste0("Klinik 0",1:9),"Klinik 10")[round(runif(n=number,min=0.5,max=10.49))],
+                               Datum=as.Date('2020/01/01')+sample(0:364,size = number,replace = T))
+       input_sim5b<-temp3[runif(n=number,min=1,max=length(temp3[,1])),]
+       input_sim5<-cbind(input_sim5a,input_sim5b)
+       
+       input_sim<-rbind(input_sim1,input_sim2,input_sim3,input_sim4,input_sim5)
+       
+       
+       
+       
+       input_sim_b<-input_sim[,c(1:4,which(as.numeric(colSums(input_sim[,c(5:14)]=="-"))!=2900)+4)]
+       
+       input_sim_b<-input_sim_b[order(input_sim_b$Klinik,input_sim_b$Datum),]
+       names(input_sim_b)[1:4]<-c("Spezies","Material","Klinik","Datum")
+       
+       input_sim_2020<-input_sim_b[,c(1,3,2,4:14)]
+       input_sim_2020<-cbind(input_sim_2020[,c(1:4)],Isolat=sample(x = c(0,1),size = nrow(input_sim_2020),
+                                                                     replace = T,prob = c(0.05,0.95)),
+                             input_sim_2020[,c(5:14)])
+       
+       
+       input2<-rbind(input_sim_2020,input_sim_2021,input_sim_2022)
+       
+       shinyjs::html("text", paste0("Demo Daten erfolgreich generiert.","<br>"), add = TRUE) 
+     }else{
+       shinyjs::html("text", paste0("<br>Input File wird eingelesen.<br><br>"), add = FALSE)
+       input_temp<-input$inputFile
+       if(is.null(input_temp)){
+         shinyjs::html("text", paste0("ERROR: Kein Input File definiert.","<br>"), add = TRUE) 
+         return()
+       }
+       if(is.null(input$sepInput)){
+         shinyjs::html("text", paste0("ERROR: Kein Trennzeichen definiert.","<br>"), add = TRUE) 
+         return()
+       }
+       if(input$sepInput=="Komma"){
+         input2<-read.table(input_temp$datapath,header=T,quote = "",comment.char = "",sep=",",stringsAsFactors = F)      
+       }
+       if(input$sepInput=="Semikolon"){
+         input2<-read.table(input_temp$datapath,header=T,quote = "",comment.char = "",sep=";",stringsAsFactors = F)      
+       }
+       if(input$sepInput=="Tab"){
+         input2<-read.table(input_temp$datapath,header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F)    
+       }
+       
+       
+       shinyjs::html("text", paste0("Input File erfolgreich eingelesen.","<br>"), add = TRUE) 
+       
+     }
+     
+     output$columnUI0<-renderText({"Wählen Sie die Spalte, die Informationen enthält zu..."})
+     
+     output$columnUI1<-renderUI({
+       selectInput('column1',label = HTML("...Spezies: &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),choices = names(input2))
+     })
+     
+     if(input$ownData=="Demo Daten laden"){
+       output$columnUI2<-renderUI({
+         selectInput('column2',label = HTML("...Klinik/Fachbereich:&nbsp&nbsp"),choices = names(input2),
+                     selected = "Klinik")
+       })
+     }else{
+       output$columnUI2<-renderUI({
+         selectInput('column2',label = HTML("...Klinik/Fachbereich:&nbsp&nbsp"),choices = names(input2))
+       })
+     }
+     
+     if(input$ownData=="Demo Daten laden"){
+       output$columnUI3<-renderUI({
+         selectInput('column3',label = HTML("...Material:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),choices = names(input2),
+                     selected="Material")
+       })
+     }else{
+       output$columnUI3<-renderUI({
+         selectInput('column3',label = HTML("...Material:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),choices = names(input2))
+       })
+     }
+     
+     if(input$ownData=="Demo Daten laden"){
+       output$columnUI4<-renderUI({
+         selectInput('column4',label = HTML("...Datum:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),
+                     choices = names(input2),selected="Datum")
+       })
+     }else{
+       output$columnUI4<-renderUI({
+         selectInput('column4',label = HTML("...Datum:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),choices = names(input2))
+       })
+     }
+     
+     if(input$ownData=="Demo Daten laden"){
+       output$columnUI42<-renderUI({
+         selectInput('column42',label = HTML("...1. Isolat:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),
+                     choices = names(input2),selected="Isolat")
+       })
+     }else{
+       output$columnUI42<-renderUI({
+         selectInput('column42',label = HTML("...1. Isolat:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),choices = names(input2))
+       })
+     }
+     
+     if(input$ownData=="Demo Daten laden"){
+       output$columnUI4b<-renderUI({
+         selectInput('column4b',label = HTML("&nbsp&nbsp&nbsp-> Datumsformat:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),
+                     choices = c("dd.mm.yy","dd.mm.yyyy",
+                                 "mm/dd/yy","mm/dd/yyyy",
+                                 "yy-mm-dd","yyyy-mm-dd"),selected = "yyyy-mm-dd")
+       })
+     }else{
+       output$columnUI4b<-renderUI({
+         selectInput('column4b',label = HTML("&nbsp&nbsp&nbsp-> Datumsformat:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp"),
+                     choices = c("dd.mm.yy","dd.mm.yyyy",
+                                 "mm/dd/yy","mm/dd/yyyy",
+                                 "yy-mm-dd","yyyy-mm-dd"))
+       })
+     }
+     
+     if(input$ownData=="Demo Daten laden"){
+       output$columnUI5<-renderUI({
+         selectInput('column5',label = HTML("...erstes Antibiotikum:&nbsp"),choices = names(input2),selected="Ampicillin")
+       })
+     }else{
+       output$columnUI5<-renderUI({
+         selectInput('column5',label = HTML("...erstes Antibiotikum:&nbsp"),choices = names(input2))
+       })
+     }
+     
+     output$columnUI6<-renderText({"Hinweis: Für alle nachfolgenden Spalten wird angenommen, dass sie ebenfalls Informationen zu Antibiotika enthalten. 
+      Der folgende Code für Resistenz-Informationen wird verlangt: 'S' für susceptible, 'I' für susceptible increased exposure, 'R' für resistant, '-' für nicht analysiert."})
+     
+     output$do_in2UI<-renderUI({
+       actionButton('do_in2',"Input konfigurieren",class = "btn-primary")
+     })
+     
+   
+     
+     observeEvent(input$do_in2,{
+       shinyjs::html("text", paste0("<br>Input File ist konfiguriert.<br><br>"), add = FALSE)
+       
+       spalten<-c(input$column1,input$column2,input$column3,input$column4,input$column5)
+       spalten_table<-table(spalten)
+       if(sum(as.numeric(spalten_table)>1)>0){
+         shinyjs::html("text", paste0("ERROR: Spalte ",names(spalten_table)[which(as.numeric(spalten_table)>1)]," wurde >1x ausgewählt.","<br>"), add = TRUE) 
+         return()
+       }
+       
+       
+       input_neu<-data.frame(PAT_PATIENTENNR=1,ORD_LABORNR=1,ORD_MATERIAL=input2[,names(input2)==input$column3],
+                             ORD_FACHBEREICH=input2[,names(input2)==input$column2],
+                             ORD_DATUM=as.character(input2[,names(input2)==input$column4]),
+                             RES_ERREGER=input2[,names(input2)==input$column1],
+                             X_STATUS=input2[,names(input2)==input$column42])
+       
+       input_neu<-cbind(input_neu,input2[,c(which(names(input2)==input$column5):length(input2[1,]))])
+       
+       input2<-input_neu
+       
+       shinyjs::html("text", paste0("<br>Input File wurde erfolgreich konfiguriert.<br><br>"), add = TRUE)
+       
+       
+       output$anweisung0pre<-renderText({NULL})
+       output$anweisung1pre<-renderText({NULL})
+       output$anweisung2pre<-renderText({NULL})
+       output$anweisung3pre<-renderText({NULL})
+       output$anweisung4pre<-renderText({NULL})
+       
+       
+   
+   ##Erreger-Statistik-Konfiguration
+     #helper1erreger<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+     if(input$column4b=="dd.mm.yy"){
+       helper1erreger<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+     }
+     if(input$column4b=="dd.mm.yyyy"){
+       helper1erreger<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+     }
+     if(input$column4b=="mm/dd/yy"){
+       helper1erreger<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+     }
+     if(input$column4b=="mm/dd/yyyy"){
+       helper1erreger<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+     }
+     if(input$column4b=="yy-mm-dd"){
+       helper1erreger<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+     }
+     if(input$column4b=="yyyy-mm-dd"){
+       helper1erreger<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+     }
+   years<-unique(format(helper1erreger,"%Y"))
+   
+   output$erregerstatUI1<-renderUI({
+     h4("Erregerstatistik")
+   })
+
+   output$erregerstatUI2<-renderUI({
+     #selectInput('erregerstat1',label = "Jahr",choices = years)
+     pickerInput('erregerstat1',label = "Jahr",choices = years,selected = max(years),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$erregerstatUI3.2<-renderUI({
+     material_helper<-unique(input2$ORD_MATERIAL[format(helper1erreger,"%Y")%in%input$erregerstat1])
+     material_helper<-material_helper[order(material_helper)]
+     #selectInput('erregerstat2.2',label = "Material",choices = c("Alle",material_helper),selected="Alle")
+     pickerInput('erregerstat2.2',label = "Material",choices = c(material_helper),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$erregerstatUI4<-renderUI({
+     erregerstat_fb<-NULL
+     if(!is.null(input$erregerstat2.2)){
+       fb_helper<-unique(input2$ORD_FACHBEREICH[format(helper1erreger,"%Y")%in%input$erregerstat1&input2$ORD_MATERIAL%in%input$erregerstat2.2])
+       fb_helper<-fb_helper[order(fb_helper)]
+       erregerstat_fb<-c(fb_helper)
+     }
+     #selectInput('erregerstat3',label = "Klinik/Fachbereich",choices = erregerstat_fb,selected = "Alle")
+     pickerInput('erregerstat3',label = "Klinik/Fachbereich",choices = c(erregerstat_fb),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$erregerstatUI4b<-renderUI({
+     #radioButtons('erregerstat3b',label = "Cut-off min. 30 Fälle",choices = c("Ja","Nein"),selected = "Ja",inline = T)
+     materialSwitch('erregerstat3b',label = "Cut-off min. 30 Fälle",value = T,status = "primary",inline = T)
+   })
+   
+   output$erregerstatUI4c<-renderUI({
+     materialSwitch('erregerstat3c',label = "Ausschließlich 1. Patienten-Isolat analysieren",value = F,status = "primary",inline = T)
+   })
+   
+   output$erregerstatUI5<-renderUI({actionButton('do_erregerstat',"Analyse starten",class = "btn-primary",disabled=T)})
+
+   
+   #shinyjs::disable("do_erregerstat")
+   observe({
+     if(!is.null(input$erregerstat3)){
+       shinyjs::enable("do_erregerstat")
+     }else{
+       shinyjs::disable("do_erregerstat")
+     }
+   })
+
+   
+   ##Start Analyse-Konfiguration - Resistenzstatistik
+   helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+   years<-unique(format(helper1,"%Y"))
+   
+   output$statistikUI1<-renderUI({
+     h4("Resistenzstatistik")
+   })
+   
+   output$statistikUI2<-renderUI({
+     #selectInput('statistik1',label = "Jahr",choices = years)
+     pickerInput('statistik1',label = "Jahr",choices = years,selected = max(years),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$statistikUI3.2<-renderUI({
+     material_helper<-unique(input2$ORD_MATERIAL[format(helper1,"%Y")%in%input$statistik1])
+     material_helper<-material_helper[order(material_helper)]
+     #selectInput('statistik2.2',label = "Material",choices = c("Alle",material_helper),selected="Alle")
+     pickerInput('statistik2.2',label = "Material",choices = c(material_helper),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$statistikUI4<-renderUI({
+     statistik_fb<-NULL
+     if(!is.null(input$statistik2.2)){
+       fb_helper<-unique(input2$ORD_FACHBEREICH[format(helper1,"%Y")%in%input$statistik1&input2$ORD_MATERIAL%in%input$statistik2.2])
+       fb_helper<-fb_helper[order(fb_helper)]
+       statistik_fb<-c(fb_helper)
+     }
+     #selectInput('statistik3',label = "Klinik/Fachbereich",choices = statistik_fb,selected = "Alle")
+     pickerInput('statistik3',label = "Klinik/Fachbereich",choices = c(statistik_fb),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$statistikUI4c<-renderUI({
+     materialSwitch('statistik3c',label = "Ausschließlich 1. Patienten-Isolat analysieren",value = F,status = "primary",inline = T)
+   })
+   
+   output$statistikUI3<-renderUI({
+     #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+     if(input$column4b=="dd.mm.yy"){
+       helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+     }
+     if(input$column4b=="dd.mm.yyyy"){
+       helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+     }
+     if(input$column4b=="mm/dd/yy"){
+       helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+     }
+     if(input$column4b=="mm/dd/yyyy"){
+       helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+     }
+     if(input$column4b=="yy-mm-dd"){
+       helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+     }
+     if(input$column4b=="yyyy-mm-dd"){
+       helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+     }
+     years<-unique(format(helper1,"%Y"))
+     
+     if(!is.null(input$statistik3c)&&input$statistik3c==T){
+       input2<-input2[input2$X_STATUS>0,]
+       #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+       if(input$column4b=="dd.mm.yy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+       }
+       if(input$column4b=="dd.mm.yyyy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+       }
+       if(input$column4b=="mm/dd/yy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+       }
+       if(input$column4b=="mm/dd/yyyy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+       }
+       if(input$column4b=="yy-mm-dd"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+       }
+       if(input$column4b=="yyyy-mm-dd"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+       }
+       years<-unique(format(helper1,"%Y"))
+     }
+     
+     alle_bakterien<-input2$RES_ERREGER
+     alle_bakterien<-alle_bakterien[format(helper1,"%Y")%in%input$statistik1&input2$ORD_FACHBEREICH%in%input$statistik3&input2$ORD_MATERIAL%in%input$statistik2.2]
+     
+     alle_bakterien_table<-table(alle_bakterien)
+     bakterien_helper<-names(alle_bakterien_table)[as.numeric(alle_bakterien_table)>=30]
+     #selectInput('statistik2',label = "Spezies",choices = c("Alle",bakterien_helper),selected = "Alle")
+     
+     if(length(bakterien_helper)>0){
+       pickerInput('statistik2',label = "Spezies",choices = c(bakterien_helper),
+                   options = list(`actions-box` = TRUE,
+                                  `deselect-all-text` = "Auswahl aufheben",
+                                  `select-all-text` = "Alle auswählen",
+                                  `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+     }else{
+       pickerInput('statistik2',label = "Spezies",choices = NULL,
+                   options = list(`none-selected-text` = "Nicht genügend Fälle"),multiple=FALSE)
+     }
+   })
+   
+   output$statistikUI5<-renderUI({actionButton('do_statistik',"Analyse starten",class = "btn-primary",disabled=T)})
+   
+   output$statistikUI6<-renderUI({downloadButton('do_statistik_xlsx',"xlsx-Export",disabled=T)})
+   
+   observe({
+     if(!is.null(input$statistik2)){
+       shinyjs::enable("do_statistik")
+       shinyjs::enable("do_statistik_xlsx")
+     }else{
+       shinyjs::disable("do_statistik")
+       shinyjs::disable("do_statistik_xlsx")
+     }
+   })
+
+   
+   ##Start Analyse-Konfiguration - Trend
+   output$trendUI1<-renderUI({
+     h4("Trend-Analyse")
+   })
+   
+   #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+   if(input$column4b=="dd.mm.yy"){
+     helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+   }
+   if(input$column4b=="dd.mm.yyyy"){
+     helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+   }
+   if(input$column4b=="mm/dd/yy"){
+     helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+   }
+   if(input$column4b=="mm/dd/yyyy"){
+     helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+   }
+   if(input$column4b=="yy-mm-dd"){
+     helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+   }
+   if(input$column4b=="yyyy-mm-dd"){
+     helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+   }
+   years<-unique(format(helper1,"%Y"))
+   
+   output$trendUI3.2<-renderUI({
+     material_all<-unique(input2$ORD_MATERIAL)
+     for(y in years){
+       material_temp<-unique(input2$ORD_MATERIAL[format(helper1,"%Y")==y])
+       material_all<-material_all[material_all%in%material_temp]
+     }
+     material_helper<-material_all
+     material_helper<-material_helper[order(material_helper)]
+     #selectInput('trend2.2',label = "Material",choices = c("Alle",material_helper),selected="Alle")
+     pickerInput('trend2.2',label = "Material",choices = c(material_helper),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+     
+   })
+   
+   output$trendUI4<-renderUI({
+     trend_fb<-NULL
+     if(!is.null(input$trend2.2)){
+       fb_all<-unique(input2$ORD_FACHBEREICH[input2$ORD_MATERIAL%in%input$trend2.2])
+       for(y in years){
+         fb_temp<-unique(input2$ORD_FACHBEREICH[format(helper1,"%Y")==y&input2$ORD_MATERIAL%in%input$trend2.2])
+         fb_all<-fb_all[fb_all%in%fb_temp]
+       }
+       fb_helper<-fb_all
+       
+       fb_helper<-fb_helper[order(fb_helper)]
+       trend_fb<-c(fb_helper)
+     }
+     
+     #selectInput('trend3',label = "Klinik/Fachbereich",choices = trend_fb,selected = "Alle")
+     pickerInput('trend3',label = "Klinik/Fachbereich",choices = c(trend_fb),
+                 options = list(`actions-box` = TRUE,
+                                `deselect-all-text` = "Auswahl aufheben",
+                                `select-all-text` = "Alle auswählen",
+                                `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+   })
+   
+   output$trendUI4c<-renderUI({
+     materialSwitch('trend3c',label = "Ausschließlich 1. Patienten-Isolat analysieren",value = F,status = "primary",inline = T)
+   })
+   
+   output$trendUI3<-renderUI({
+     if(!is.null(input$trend2.2)&&!is.null(input$trend3)){
+       #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+       if(input$column4b=="dd.mm.yy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+       }
+       if(input$column4b=="dd.mm.yyyy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+       }
+       if(input$column4b=="mm/dd/yy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+       }
+       if(input$column4b=="mm/dd/yyyy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+       }
+       if(input$column4b=="yy-mm-dd"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+       }
+       if(input$column4b=="yyyy-mm-dd"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+       }
+       years<-unique(format(helper1,"%Y"))
+       
+       if(!is.null(input$trend3c)&&input$trend3c==T){
+         input2<-input2[input2$X_STATUS>0,]
+         #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+         if(input$column4b=="dd.mm.yy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+         }
+         if(input$column4b=="dd.mm.yyyy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+         }
+         if(input$column4b=="mm/dd/yy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+         }
+         if(input$column4b=="mm/dd/yyyy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+         }
+         if(input$column4b=="yy-mm-dd"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+         }
+         if(input$column4b=="yyyy-mm-dd"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+         }
+         years<-unique(format(helper1,"%Y"))
+       }
+       
+       alle_bakterien<-input2$RES_ERREGER
+       alle_bakterien<-alle_bakterien[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2]
+       helper_neu<-helper1[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2]
+       
+       if(length(helper_neu)>0){
+         all_years<-format(helper_neu,"%Y")
+         alle_bakterien_table<-table(alle_bakterien,all_years)
+         
+         #alle_bakterien_table<-alle_bakterien_table[rowSums(alle_bakterien_table>30)==length(alle_bakterien_table[1,]),]
+         #for(laenge in 1:length(alle_bakterien_table[1,])){
+         #  alle_bakterien_table<-alle_bakterien_table[alle_bakterien_table[,laenge]>30,]
+         #}
+         #bakterien_helper<-row.names(alle_bakterien_table)
+         #bakterien_helper<-row.names(alle_bakterien_table)[rowSums(alle_bakterien_table>=30)==length(alle_bakterien_table[1,])]
+         bakterien_helper<-row.names(alle_bakterien_table)[rowSums(alle_bakterien_table>=30)!=0]
+         
+         if(length(bakterien_helper)>0){
+           #selectInput('trend2',label = "Spezies",choices = c(bakterien_helper))
+           pickerInput('trend2',label = "Spezies",choices = c(bakterien_helper),
+                       options = list(`none-selected-text` = "Nichts ausgewählt"),multiple=FALSE)
+         }else{
+           #selectInput('trend2',label = "Spezies",choices = c("Nicht genügend Fälle"))
+           pickerInput('trend2',label = "Spezies",choices = NULL,
+                       options = list(`none-selected-text` = "Nicht genügend Fälle"),multiple=FALSE)
+         }
+       }else{
+         pickerInput('trend2',label = "Spezies",choices = NULL,
+                     options = list(`none-selected-text` = "Nicht genügend Fälle"),multiple=FALSE)
+       }
+     }else{
+       pickerInput('trend2',label = "Spezies",choices = NULL,
+                   options = list(`none-selected-text` = "Nicht genügend Fälle"),multiple=FALSE)
+     }
+   })
+   
+   output$trendUI3.3<-renderUI({
+     if(!is.null(input$trend2)&!is.null(input$trend2.2)&&!is.null(input$trend3)){
+       #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+       if(input$column4b=="dd.mm.yy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+       }
+       if(input$column4b=="dd.mm.yyyy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+       }
+       if(input$column4b=="mm/dd/yy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+       }
+       if(input$column4b=="mm/dd/yyyy"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+       }
+       if(input$column4b=="yy-mm-dd"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+       }
+       if(input$column4b=="yyyy-mm-dd"){
+         helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+       }
+       years<-unique(format(helper1,"%Y"))
+       
+       if(!is.null(input$trend3c)&&input$trend3c==T){
+         input2<-input2[input2$X_STATUS>0,]
+         #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+         if(input$column4b=="dd.mm.yy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+         }
+         if(input$column4b=="dd.mm.yyyy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+         }
+         if(input$column4b=="mm/dd/yy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+         }
+         if(input$column4b=="mm/dd/yyyy"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+         }
+         if(input$column4b=="yy-mm-dd"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+         }
+         if(input$column4b=="yyyy-mm-dd"){
+           helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+         }
+         years<-unique(format(helper1,"%Y"))
+       }
+       
+       input_filter<-input2
+       input_filter<-input_filter[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2&input2$RES_ERREGER%in%input$trend2,]
+       helper_neu<-helper1[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2&input2$RES_ERREGER%in%input$trend2]
+       
+       all_years<-format(helper_neu,"%Y")
+       
+       #temp_ab_namen_final<-c()
+       #for(year_is in unique(all_years)){
+      #   temp<-unlist(stri_split_fixed(input_filter$ABs[all_years==year_is],pattern = " "))
+      #   temp2<-table(temp)
+      #   temp_ab_namen_final<-c(temp_ab_namen_final,names(temp2[temp2>=30]))
+       #}
+       
+       temp_ab<-apply(input_filter[,grep("_",names(input_filter),fixed=T,invert = T)],2,function(x){sum(x!="-")})
+       temp_ab<-temp_ab[temp_ab>0]
+       temp_ab_namen<-names(temp_ab)
+       temp_ab_namen_final<-c()
+       
+       for(ab_relevant in temp_ab_namen){
+         for(year_is in unique(all_years)){
+           temp_ab_test<-input_filter[all_years==year_is,names(input_filter)==ab_relevant]
+           if(sum(temp_ab_test!="-")>=30){
+             temp_ab_namen_final<-c(temp_ab_namen_final,ab_relevant)
+           }
+         }
+       }
+       temp_ab_namen_final<-as.vector(unique(temp_ab_namen_final))
+       if(length(temp_ab_namen_final)>0){
+         temp_ab_namen_final<-temp_ab_namen_final[order(temp_ab_namen_final)]
+         
+         #selectInput('trend2.3',label = "Antibiotikum",choices = c("Alle",temp_ab_namen_final))
+         pickerInput('trend2.3',label = "Antibiotikum",choices = c(temp_ab_namen_final),
+                     options = list(`actions-box` = TRUE,
+                                    `deselect-all-text` = "Auswahl aufheben",
+                                    `select-all-text` = "Alle auswählen",
+                                    `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+       }else{
+         pickerInput('trend2.3',label = "Antibiotikum",choices = NULL,
+                     options = list(`none-selected-text` = "Nicht genügend Fälle"),multiple=FALSE)
+       }
+       
+     }else{
+       #selectInput('trend2.3',label = "Antibiotikum",choices = c("Nicht genügend Fälle"))
+       pickerInput('trend2.3',label = "Antibiotikum",choices = NULL,
+                   options = list(`none-selected-text` = "Nicht genügend Fälle"),multiple=FALSE)
+     }
+   })
+   
+   output$trendUI5<-renderUI({actionButton('do_trend',"Analyse starten",class = "btn-primary",disabled=T)})
+   
+   output$trendUI6<-renderUI({downloadButton('do_trend_xlsx',"xlsx-Export",disabled=T)})
+   
+   observe({
+     if(!is.null(input$trend2.3)){
+       shinyjs::enable("do_trend")
+       shinyjs::enable("do_trend_xlsx")
+     }else{
+       shinyjs::disable("do_trend")
+       shinyjs::disable("do_trend_xlsx")
+     }
+   })
+
+   
+   ##Start Analyse-Konfiguration - Teil 1
+    #####Bakterien
+   #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+   if(input$column4b=="dd.mm.yy"){
+     helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+   }
+   if(input$column4b=="dd.mm.yyyy"){
+     helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+   }
+   if(input$column4b=="mm/dd/yy"){
+     helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+   }
+   if(input$column4b=="mm/dd/yyyy"){
+     helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+   }
+   if(input$column4b=="yy-mm-dd"){
+     helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+   }
+   if(input$column4b=="yyyy-mm-dd"){
+     helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+   }
+    years_bakterien<-unique(format(helper1bakterien,"%Y"))
+    
+    output$bakteriumUIinitial<-renderUI({
+      h4("Cluster-Analyse: Interaktiv")
+    })
+    
+    output$bakteriumUI0a<-renderUI({
+      #selectInput('analysis_type1a',label = "Jahr",choices = years_bakterien)
+      #selectInput('analysis_type1a',label = "Jahr",choices = jahre_verfuegbar,selected = jahr_gewaehlt)
+      pickerInput('analysis_type1a',label = "Jahr",choices = years_bakterien,selected = max(years_bakterien),
+                  options = list(`actions-box` = TRUE,
+                                 `deselect-all-text` = "Auswahl aufheben",
+                                 `select-all-text` = "Alle auswählen",
+                                 `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+    })
+    
+    output$bakteriumUI0b<-renderUI({
+      #input2<-read.table(paste0("www/Daten",input$analysis_type1a,".txt"),
+      #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      #years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      
+      material_helper<-unique(input2$ORD_MATERIAL[format(helper1bakterien,"%Y")==input$analysis_type1a])
+      material_helper<-material_helper[order(material_helper)]
+      #selectInput('analysis_type1b',label = "Material",choices = c("Alle",material_helper),selected="Alle")
+      pickerInput('analysis_type1b',label = "Material",choices = c(material_helper),
+                  options = list(`actions-box` = TRUE,
+                                 `deselect-all-text` = "Auswahl aufheben",
+                                 `select-all-text` = "Alle auswählen",
+                                 `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+    })
+    
+    output$bakteriumUI0c<-renderUI({
+      materialSwitch('analysis_type1c',label = "Ausschließlich 1. Patienten-Isolat analysieren",value = F,status = "primary",inline = T)
+    })
+    
+    output$bakteriumUI0<-renderUI({
+      radioButtons('analysis_type1',label = "Analyse wird unabhängig durchgeführt",
+                   choices = c("pro Spezies","pro Klinik/Fachbereich"),selected = "pro Spezies",inline = T)
+    })
+    
+    output$anweisung<-renderText({NULL})
+    
+    output$bakteriumUI1<-renderUI({conditionalPanel(
+      condition="input.analysis_type1=='pro Spezies'",
+      h4("Unabhängige Analyse pro Spezies"),
+      radioButtons('bak_select',label = "Alle Spezies analysieren? (min. 30 Fälle)",
+                   choices = c("Ja","Nein"),selected = "Ja",inline = T)
+    )})
+
+    output$bakteriumUI2<-renderUI({
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      
+      if(!is.null(input$analysis_type1c)&&input$analysis_type1c==T){
+        input2<-input2[input2$X_STATUS>0,]
+        #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      }
+      
+      alle_bakterien<-input2$RES_ERREGER
+      #if(!is.null(input$analysis_type1b)&&!is.null(input$analysis_type1a)){
+        #if(input$analysis_type1b=="Alle"){
+        #  alle_bakterien<-alle_bakterien[format(helper1bakterien,"%Y")==input$analysis_type1a]
+        #}else{
+        #  alle_bakterien<-alle_bakterien[format(helper1bakterien,"%Y")==input$analysis_type1a&input2$ORD_MATERIAL==input$analysis_type1b]
+        #}
+
+        alle_bakterien<-alle_bakterien[format(helper1bakterien,"%Y")%in%input$analysis_type1a&input2$ORD_MATERIAL%in%input$analysis_type1b]
+        
+        alle_bakterien_table<-table(alle_bakterien)
+        bakterien<-names(alle_bakterien_table)[as.numeric(alle_bakterien_table)>30]
+        
+        conditionalPanel(
+          condition="input.bak_select=='Nein'&&input.analysis_type1=='pro Spezies'",
+          checkboxGroupInput('bak_selected',label = "Auswahl Spezies",
+                             choices =bakterien)
+        )
+      #}
+    })
+    
+    output$bakteriumUI3<-renderUI({conditionalPanel(
+      condition="input.analysis_type1=='pro Spezies'",
+      hr(),
+      h5("Analyse per Heatmap"),
+      h6("Hinweis: Antibiotika mit >70% fehlenden Werten werden für das hierarchische Clustering automatisch gefiltert."),
+      checkboxGroupInput('cluster_type_bak_heat1',label = "Darstellung Heatmap",
+                         choices = c("Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz",
+                                     "Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum",
+                                     "Hierarchisches Clustering")),
+      hr(),
+      h5("Analyse per Dimensionsreduktion (UMAP)"),
+      h6("Hinweis: Analyse nur auf vollständigen Daten möglich. Antibiotika mit >20% 
+         fehlenden Werten werden automatisch gefiltert. Anschließend werden alle Fälle mit fehlenden Werten gefiltert."),
+      checkboxGroupInput('cluster_type_bak_umap1',label = "Darstellung UMAP",
+                         choices = c("Plot mit eingefärbten Kliniken/Fachbereichen",
+                                     "Plot mit eingefärbten Clustern"))
+    )})
+    
+    output$bakteriumUI4 <- renderUI({
+      req(input$analysis_type1=='pro Spezies'&&(sum(input$cluster_type_bak_umap1%in%'Plot mit eingefärbten Clustern')==1||length(input$cluster_type_bak_umap1)==2))
+      checkboxGroupInput('cluster_type_bak_umap2',label = "Zusätzliche Heatmap",
+                         choices = c("Daten sortieren nach UMAP-Clustern",
+                                     "Daten sortieren nach Kliniken/Fachbereichen"))
+    })
+    
+    
+    #####Kliniken
+    output$klinikUI1<-renderUI({conditionalPanel(
+      condition="input.analysis_type1=='pro Klinik/Fachbereich'",
+      h4("Unabhängige Analyse pro Klinik/Fachbereich"),
+      radioButtons('clinic_select',label = "Alle Kliniken/Fachbereiche analysieren?  (min. 30 Fälle)",
+                   choices = c("Ja","Nein"),selected = "Ja",inline = T)
+    )})
+    
+    output$klinikUI2<-renderUI({
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      
+      if(!is.null(input$analysis_type1c)&&input$analysis_type1c==T){
+        input2<-input2[input2$X_STATUS>0,]
+        #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      }
+      
+      alle_fachbereiche<-input2$ORD_FACHBEREICH
+      #if(!is.null(input$analysis_type1b)){
+      #  if(input$analysis_type1b=="Alle"){
+      #    alle_fachbereiche<-alle_fachbereiche[format(helper1bakterien,"%Y")==input$analysis_type1a]
+      #  }else{
+      #    alle_fachbereiche<-alle_fachbereiche[format(helper1bakterien,"%Y")==input$analysis_type1a&input2$ORD_MATERIAL==input$analysis_type1b]
+      #  }
+          alle_fachbereiche<-alle_fachbereiche[format(helper1bakterien,"%Y")%in%input$analysis_type1a&input2$ORD_MATERIAL%in%input$analysis_type1b]
+        
+        alle_fachbereiche_table<-table(alle_fachbereiche)
+        fachbereich<-names(alle_fachbereiche_table)[as.numeric(alle_fachbereiche_table)>30]
+        
+        conditionalPanel(
+          condition="input.clinic_select=='Nein'&&input.analysis_type1=='pro Klinik/Fachbereich'",
+          checkboxGroupInput('clinic_selected',label = "Auswahl Kliniken/Fachbereiche",
+                             choices =fachbereich),
+          hr()
+        )
+      #}
+    })
+    
+    output$klinikUI3<-renderUI({conditionalPanel(
+      condition="input.analysis_type1=='pro Klinik/Fachbereich'",
+      hr(),
+      h5("Analyse per Heatmap"),
+      h6("Hinweis: Antibiotika mit >70% fehlenden Werten werden für das hierarchische Clustering automatisch gefiltert."),
+      checkboxGroupInput('cluster_type_klinik_heat1',label = "Art des durchzuführenden Clusterings",
+                         choices = c("Daten sortieren nach Spezies",
+                                     "Hierarchisches Clustering"))
+    )})
+    
+    output$analyseUI<-renderUI({actionButton('do_analyse',"Analyse starten",class = "btn-primary",disabled=T)})
+    
+    observe({
+      if(!is.null(input$analysis_type1b)){
+        shinyjs::enable("do_analyse")
+      }else{
+        shinyjs::disable("do_analyse")
+      }
+    })
+
+    ##Start Download-Konfiguration
+    output$downloadUIinitial<-renderUI({
+      h4("Cluster-Analyse: Export")
+    })
+    
+    output$anweisung2<-renderText({NULL})
+    
+    output$downloadUI1<-renderUI({
+      radioButtons('report_name',label = "Dateiname des PDF-Exports",
+                   choices = c("Standard (Resistenz-Clusteranalyse_<datum>)","Individuell"),
+                   selected = "Standard (Resistenz-Clusteranalyse_<datum>)")
+    })
+
+    output$downloadUI2<-renderUI({conditionalPanel(
+      condition="input.report_name=='Individuell'",
+      textInput("download_name_individuell",label = NULL,value = "")
+    )})
+    
+    output$downloadUI3<-renderUI({
+      checkboxGroupInput('download_analysis_type1',label = "Analyse wird unabhängig durchgeführt",
+                   choices = c("pro Spezies","pro Klinik/Fachbereich"),inline = T)
+    })
+    
+    output$downloadUI4<-renderUI({
+      #actionButton('do_report',"Report generieren",class = "btn-primary")
+      downloadButton('downloadData', 'Download')
+    })
+    
+    ############################################
+    #output$downloadUI5<-renderUI({
+    #  downloadButton('downloadData', 'Download')
+    #})
+    ###########################################
+    
+    ##Bakterien
+    download_helper1bakterien<-helper1bakterien
+    download_years_bakterien<-years_bakterien
+    
+    output$downloadUIbak0a<-renderUI({
+      #selectInput('download_analysis_type1a',label = "Jahr",choices = download_years_bakterien)
+      pickerInput('download_analysis_type1a',label = "Jahr",choices = download_years_bakterien,selected = max(download_years_bakterien),
+                  options = list(`actions-box` = TRUE,
+                                 `deselect-all-text` = "Auswahl aufheben",
+                                 `select-all-text` = "Alle auswählen",
+                                 `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+    })
+    
+    output$downloadUIbak0b<-renderUI({
+      download_material_helper<-unique(input2$ORD_MATERIAL[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a])
+      download_material_helper<-download_material_helper[order(download_material_helper)]
+      #selectInput('download_analysis_type1b',label = "Material",choices = c("Alle",download_material_helper),selected="Alle")
+      pickerInput('download_analysis_type1b',label = "Material",choices = c(download_material_helper),
+                  options = list(`actions-box` = TRUE,
+                                 `deselect-all-text` = "Auswahl aufheben",
+                                 `select-all-text` = "Alle auswählen",
+                                 `none-selected-text` = "Nichts ausgewählt"),multiple=TRUE)
+    })
+    
+    output$downloadUIbak0c<-renderUI({
+      materialSwitch('download_analysis_type1c',label = "Ausschließlich 1. Patienten-Isolat analysieren",value = F,status = "primary",inline = T)
+    })
+    
+    output$downloadUIbak1<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      h4("Unabhängige Analyse pro Spezies")
+    })
+    output$downloadUIbak1b<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      radioButtons('download_bak_select',label = "Alle Spezies analysieren? (min. 30 Fälle)",
+                   choices = c("Ja","Nein"),selected = "Ja",inline = T)
+    })
+    
+    #download_bakterien<-unique(input2$RES_ERREGER)
+    #download_bakterien<-download_bakterien[order(download_bakterien)]
+    
+    output$downloadUIbak2<-renderUI({
+      req(input$download_bak_select=='Nein'&&(sum(input$download_analysis_type1=='pro Spezies')==1||length(input$download_analysis_type1)==2))
+      
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      download_helper1bakterien<-helper1bakterien
+      download_years_bakterien<-years_bakterien
+      
+      if(!is.null(input$download_analysis_type1c)&&input$download_analysis_type1c==T){
+        input2<-input2[input2$X_STATUS>0,]
+        #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        years_bakterien<-unique(format(helper1bakterien,"%Y"))
+        download_helper1bakterien<-helper1bakterien
+        download_years_bakterien<-years_bakterien
+      }
+      
+      download_alle_bakterien<-input2$RES_ERREGER
+      #if(input$download_analysis_type1b=="Alle"){
+      #  download_alle_bakterien<-download_alle_bakterien[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a]
+        #download_bakterien<-unique(input2$RES_ERREGER[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a])
+        #download_bakterien<-download_bakterien[order(download_bakterien)]
+        #download_bakterien<-download_bakterien[as.vector(table(input2$RES_ERREGER[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a]))>1]
+      #}else{
+      #  download_alle_bakterien<-download_alle_bakterien[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a&input2$ORD_MATERIAL==input$download_analysis_type1b]
+        #download_bakterien<-unique(input2$RES_ERREGER[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a&input2$ORD_MATERIAL==input$download_analysis_type1b])
+        #download_bakterien<-download_bakterien[order(download_bakterien)]
+        #download_bakterien<-download_bakterien[as.vector(table(input2$RES_ERREGER[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a&input2$ORD_MATERIAL==input$download_analysis_type1b]))>1]
+      #}
+        download_alle_bakterien<-download_alle_bakterien[format(download_helper1bakterien,"%Y")%in%input$download_analysis_type1a&input2$ORD_MATERIAL%in%input$download_analysis_type1b]
+        
+      download_alle_bakterien_table<-table(download_alle_bakterien)
+      download_bakterien<-names(download_alle_bakterien_table)[as.numeric(download_alle_bakterien_table)>30]
+      checkboxGroupInput('download_bak_selected',label = "Auswahl Spezies",
+                         choices =download_bakterien)
+     })
+    
+    output$downloadUIbak3<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      hr()
+    })
+    
+    output$downloadUIbak3b<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      h5("Analyse per Heatmap")
+    })
+    
+    output$downloadUIbak3c<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      h6("Hinweis: Antibiotika mit >70% fehlenden Werten werden für das hierarchische Clustering automatisch gefiltert.")
+    })
+    
+    output$downloadUIbak3d<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      checkboxGroupInput('download_cluster_type_bak_heat1',label = "Darstellung Heatmap",
+                         choices = c("Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz",
+                                     "Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum",
+                                     "Hierarchisches Clustering"))
+    })
+    
+    output$downloadUIbak3e<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      hr()
+    })
+    
+    output$downloadUIbak3f<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      h5("Analyse per Dimensionsreduktion (UMAP)")
+    })
+    
+    output$downloadUIbak3g<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      h6("Hinweis: Analyse nur auf vollständigen Daten möglich. Antibiotika mit >20% 
+         fehlenden Werten werden automatisch gefiltert. Anschließend werden alle Fälle mit fehlenden Werten gefiltert.")
+    })
+    
+    output$downloadUIbak3h<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)
+      checkboxGroupInput('download_cluster_type_bak_umap1',label = "Darstellung UMAP",
+                         choices = c("Plot mit eingefärbten Kliniken/Fachbereichen",
+                                     "Plot mit eingefärbten Clustern"))
+    })
+    output$downloadUIbak4 <- renderUI({
+      req((sum(input$download_analysis_type1%in%'pro Spezies')==1||length(input$download_analysis_type1)==2)&&(sum(input$download_cluster_type_bak_umap1%in%'Plot mit eingefärbten Clustern')==1||length(input$download_cluster_type_bak_umap1)==2))
+      checkboxGroupInput('download_cluster_type_bak_umap2',label = "Zusätzliche Heatmap",
+                         choices = c("Daten sortieren nach UMAP-Clustern",
+                                     "Daten sortieren nach Kliniken/Fachbereichen"))
+    })
+    
+    
+    #####Kliniken
+    output$downloadUIklinik1<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2)
+      h4("Unabhängige Analyse pro Klinik/Fachbereich")
+    })
+    
+    output$downloadUIklinik1b<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2)
+      radioButtons('download_clinic_select',label = "Alle Kliniken/Fachbereiche analysieren? (min. 30 Fälle)",
+                   choices = c("Ja","Nein"),selected = "Ja",inline = T)
+    })
+
+    download_fachbereich<-unique(input2$ORD_FACHBEREICH)
+    download_fachbereich<-download_fachbereich[order(download_fachbereich)]
+    
+    output$downloadUIklinik2<-renderUI({
+      req(input$download_clinic_select=='Nein'&&(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2))
+      
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      download_helper1bakterien<-helper1bakterien
+      download_years_bakterien<-years_bakterien
+      
+      if(!is.null(input$download_analysis_type1c)&&input$download_analysis_type1c==T){
+        input2<-input2[input2$X_STATUS>0,]
+        #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        years_bakterien<-unique(format(helper1bakterien,"%Y"))
+        download_helper1bakterien<-helper1bakterien
+        download_years_bakterien<-years_bakterien
+      }
+      
+      download_alle_fachbereiche<-input2$ORD_FACHBEREICH
+      #if(input$download_analysis_type1b=="Alle"){
+      #  download_alle_fachbereiche<-download_alle_fachbereiche[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a]
+        #download_fachbereich<-unique(input2$ORD_FACHBEREICH[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a])
+        #download_fachbereich<-download_fachbereich[order(download_fachbereich)]
+      #}else{
+      #  download_alle_fachbereiche<-download_alle_fachbereiche[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a&input2$ORD_MATERIAL==input$download_analysis_type1b]
+        #download_fachbereich<-unique(input2$ORD_FACHBEREICH[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a&input2$ORD_MATERIAL==input$download_analysis_type1b])
+        #download_fachbereich<-download_fachbereich[order(download_fachbereich)]
+      #}
+        download_alle_fachbereiche<-download_alle_fachbereiche[format(download_helper1bakterien,"%Y")%in%input$download_analysis_type1a&input2$ORD_MATERIAL%in%input$download_analysis_type1b]
+        
+      download_alle_fachbereiche_table<-table(download_alle_fachbereiche)
+      download_fachbereich<-names(download_alle_fachbereiche_table)[as.numeric(download_alle_fachbereiche_table)>30]
+      checkboxGroupInput('download_clinic_selected',label = "Auswahl Kliniken/Fachbereiche",
+                         choices =download_fachbereich)
+    })
+    
+    output$downloadUIklinik3<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2)
+      hr()
+    })
+    
+    output$downloadUIklinik3b<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2)
+      h5("Analyse per Heatmap")
+    })
+    
+    output$downloadUIklinik3c<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2)
+      h6("Hinweis: Antibiotika mit >70% fehlenden Werten werden für das hierarchische Clustering automatisch gefiltert.")
+    })
+    
+    output$downloadUIklinik3d<-renderUI({
+      req(sum(input$download_analysis_type1%in%'pro Klinik/Fachbereich')==1||length(input$download_analysis_type1)==2)
+      checkboxGroupInput('download_cluster_type_klinik_heat1',label = "Darstellung Heatmap",
+                         choices = c("Daten sortieren nach Spezies",
+                                     "Hierarchisches Clustering"))
+    })
+    
+    rv <- reactiveValues()
+    
+    runBuildModel <- function(input, output) {
+      rv$outputText = paste0("<b>Jahr: </b>",paste0(input$statistik1,collapse = " + "),"<br>",
+                             "<b>Material: </b>",paste0(input$statistik2.2,collapse = " + "),"<br>",
+                             "<b>Klinik/Fachbereich: </b>",paste0(input$statistik3,collapse = " + "),"<br>",
+                             "<b>Patienten-Isolate: </b>",paste0(ifelse(input$statistik3c==F,"Alle","Ausschließlich 1.")),"<br>",
+                             "<b>Spezies: </b>",paste0(input$statistik2,collapse = ", "))
+      #shinyjs::html(id = 'text_zusammenfassung0c', rv$outputText)
+      #shinyjs::html(id = 'text_zusammenfassung0c2', rv$outputText)
+            rv$outputText2 = paste0("<b>Jahr: </b>",paste0(input$statistik1,collapse = " + "),"<br>",
+                              "<b>Material: </b>",paste0(input$statistik2.2,collapse = " + "))
+            rv$outputText3 = paste0("<b>Material: </b>",paste0(input$trend2.2,collapse = " + "),"<br>",
+                                    "<b>Klinik/Fachbereich: </b>",paste0(input$trend3,collapse = " + "),"<br>",
+                                    "<b>Patienten-Isolate: </b>",paste0(ifelse(input$trend3c==F,"Alle","Ausschließlich 1.")),"<br>",
+                                    "<b>Spezies: </b>",paste0(input$trend2,collapse = ", "),"<br>",
+                                    "<b>Antibiotikum: </b>",paste0(input$trend2.3,collapse = ", "))
+            rv$outputText4 = paste0("<b>Jahr: </b>",paste0(input$erregerstat1,collapse = " + "),"<br>",
+                                   "<b>Material: </b>",paste0(input$erregerstat2.2,collapse = " + "),"<br>",
+                                   "<b>Klinik/Fachbereich: </b>",paste0(input$erregerstat3,collapse = " + "),"<br>",
+                                   "<b>Patienten-Isolate: </b>",paste0(ifelse(input$erregerstat3c==F,"Alle","Ausschließlich 1.")))
+    }
+
+    
+    
+    
+    observeEvent(input$do_erregerstat,{
+      updateTabsetPanel(session,"main",
+                        selected="Erregerstatistik")
+      progress <- shiny::Progress$new()
+      progress$set(message = "Erstelle Erregerstatistik", value = 0)
+      
+      #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+      #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+      if(input$erregerstat3c==T){
+        input2<-input2[input2$X_STATUS>0,]
+      }
+      
+      #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years<-unique(format(helper1,"%Y"))
+      
+      shinyjs::html("text", paste0("<br>Erregerstatistik wird erstellt.<br><br>"), add = FALSE)
+      
+      coxDF<-runBuildModel(input, output)  
+      observe(output$text_zusammenfassung_erreger <- renderText(HTML(rv$outputText4)))
+      
+      #helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1statistik_e<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      input3<-input2[format(helper1statistik_e,"%Y")%in%input$erregerstat1&input2$ORD_MATERIAL%in%input$erregerstat2.2,]
+      
+      stat_fachbereich<-input$erregerstat3
+      stat_material<-input$erregerstat2.2
+
+      ab_spalten<-grep("_",names(input3),invert = T)
+      table_fach_bak<-as.data.frame(cbind(names(table(input3$RES_ERREGER[input3$ORD_MATERIAL%in%input$erregerstat2.2&input3$ORD_FACHBEREICH%in%input$erregerstat3])),
+                                          table(input3$RES_ERREGER[input3$ORD_MATERIAL%in%input$erregerstat2.2&input3$ORD_FACHBEREICH%in%input$erregerstat3],input3$ORD_MATERIAL[input3$ORD_MATERIAL%in%input$erregerstat2.2&input3$ORD_FACHBEREICH%in%input$erregerstat3])))
+      row.names(table_fach_bak)<-NULL
+      names(table_fach_bak)[1]<-"Spezies"
+      for(i in 2:length(table_fach_bak[1,])){
+        table_fach_bak[,i]<-as.numeric(table_fach_bak[,i])
+      }
+      if(length(input$erregerstat2.2)>1){
+        table_fach_bak$Summe<-rowSums(table_fach_bak[,c(2:length(table_fach_bak[1,]))])
+      }else{
+        table_fach_bak$Summe<-table_fach_bak[,2]
+      }
+      table_fach_bak<-table_fach_bak[order(table_fach_bak[,length(table_fach_bak[1,])],decreasing = T),]
+      table_fach_bak_colsums<-sum(table_fach_bak[,length(table_fach_bak[1,])])
+      
+      output$text_erregerstat2<-renderText({NULL})
+
+      if(input$erregerstat3b==FALSE){
+        output$datatable_erregerstat1 <- renderDataTable(datatable(table_fach_bak,rownames=F,
+                                                                   #caption = htmltools::tags$caption(paste0("Klinik/Fachbereich: ",stat_fachbereich), style="color:rgb(49,126,172);font-size: 14pt"),
+                                                                   extensions = 'Buttons', options = list(
+                                                                     dom = 'Blfrtip',
+                                                                     buttons = c('csv', 'excel', 'print'),
+                                                                     columnDefs = list(list(className = 'dt-right', targets = c(1:(length(table_fach_bak[1,])-1)))))),
+                                                         server=F
+        )
+        
+        if(nrow(table_fach_bak)>0){
+          table_fach_bak$Relativ<-format(round(100*table_fach_bak[,length(table_fach_bak[1,])]/table_fach_bak_colsums,digits=1),nsmall=1)
+          table_fach_bak<-table_fach_bak[,c("Spezies","Summe","Relativ")]
+          table_fach_bak$KI<-"-"
+          
+          for(j in 1:length(table_fach_bak[,1])){
+            if(table_fach_bak[j,2]>0){
+              stat_help1<-format(round(100*binom.test(x=table_fach_bak$Summe[j],n=table_fach_bak_colsums,
+                                                      p=table_fach_bak$Summe[j]/table_fach_bak_colsums)$conf.int[1],1),nsmall=1)
+              stat_help2<-format(round(100*binom.test(x=table_fach_bak$Summe[j],n=table_fach_bak_colsums,
+                                                      p=table_fach_bak$Summe[j]/table_fach_bak_colsums)$conf.int[2],1),nsmall=1)
+              table_fach_bak$KI[j]<-paste0(stat_help1," - ",stat_help2)          
+            }
+          }
+          names(table_fach_bak)<-c("Spezies","N","N %","95% KI")
+          output$datatable_erregerstat1 <- renderDataTable(datatable(table_fach_bak,rownames=F,
+                                                                     #caption = htmltools::tags$caption(paste0("Klinik/Fachbereich: ",stat_fachbereich), style="color:rgb(49,126,172);font-size: 14pt"),
+                                                                     extensions = 'Buttons', options = list(
+                                                                       dom = 'Blfrtip',
+                                                                       buttons = c('csv', 'excel', 'print'),
+                                                                       columnDefs = list(list(className = 'dt-right', targets = c(1:(length(table_fach_bak[1,])-1)))))),
+                                                           server=F
+          )
+        }
+      }else{
+        table_fach_bak<-table_fach_bak[table_fach_bak$Summe>=30,]  
+        output$datatable_erregerstat1 <- renderDataTable(datatable(table_fach_bak,rownames=F,
+                                                                   #caption = htmltools::tags$caption(paste0("Klinik/Fachbereich: ",stat_fachbereich), style="color:rgb(49,126,172);font-size: 14pt"),
+                                                                   extensions = 'Buttons', options = list(
+                                                                     dom = 'Blfrtip',
+                                                                     buttons = c('csv', 'excel', 'print'),
+                                                                     columnDefs = list(list(className = 'dt-right', targets = c(1:(length(table_fach_bak[1,])-1)))))),
+                                                         server=F
+        )
+        
+        if(nrow(table_fach_bak)>0){
+          table_fach_bak$Relativ<-format(round(100*table_fach_bak[,length(table_fach_bak[1,])]/table_fach_bak_colsums,digits=1),nsmall=1)
+          table_fach_bak<-table_fach_bak[,c("Spezies","Summe","Relativ")]
+          table_fach_bak$KI<-"-"
+          
+          for(j in 1:length(table_fach_bak[,1])){
+            if(table_fach_bak[j,2]>0){
+              stat_help1<-format(round(100*binom.test(x=table_fach_bak$Summe[j],n=table_fach_bak_colsums,
+                                                      p=table_fach_bak$Summe[j]/table_fach_bak_colsums)$conf.int[1],1),nsmall=1)
+              stat_help2<-format(round(100*binom.test(x=table_fach_bak$Summe[j],n=table_fach_bak_colsums,
+                                                      p=table_fach_bak$Summe[j]/table_fach_bak_colsums)$conf.int[2],1),nsmall=1)
+              table_fach_bak$KI[j]<-paste0(stat_help1," - ",stat_help2)          
+            }
+          }
+          names(table_fach_bak)<-c("Spezies","N","N %","95% KI")
+          output$datatable_erregerstat1 <- renderDataTable(datatable(table_fach_bak,rownames=F,
+                                                                     #caption = htmltools::tags$caption(paste0("Klinik/Fachbereich: ",stat_fachbereich), style="color:rgb(49,126,172);font-size: 14pt"),
+                                                                     extensions = 'Buttons', options = list(
+                                                                       dom = 'Blfrtip',
+                                                                       buttons = c('csv', 'excel', 'print'),
+                                                                       columnDefs = list(list(className = 'dt-right', targets = c(1:(length(table_fach_bak[1,])-1)))))),
+                                                           server=F
+          )
+        }
+
+      }
+            progress$close()
+      shinyjs::html("text", paste0("<br><br>","Erregerstatistik erfolgreich erstellt.","<br>"), add = TRUE)  
+    })
+    
+    
+    observeEvent(input$do_statistik,{
+      updateTabsetPanel(session,"main",
+                        selected="Resistenzstatistik")
+      progress <- shiny::Progress$new()
+      progress$set(message = "Erstelle Resistenzstatistik", value = 0)
+      
+      #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+      #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+      if(input$statistik3c==T){
+        input2<-input2[input2$X_STATUS>0,]
+      }
+      
+      #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years<-unique(format(helper1,"%Y"))
+      
+      shinyjs::html("text", paste0("<br>Statistische Analyse wird gestartet.<br><br>"), add = FALSE)
+      coxDF<-runBuildModel(input, output)    
+      
+      observe(output$text_zusammenfassung0c <- renderText(HTML(rv$outputText)))
+      observe(output$text_zusammenfassung0c2 <- renderText(HTML(rv$outputText)))
+      observe(output$text_zusammenfassung0c3 <- renderText(HTML(rv$outputText2)))
+      observe(output$text_zusammenfassung0c4 <- renderText(HTML(rv$outputText2)))
+      
+      
+      #########################
+      ###Eigentliche Analyse###
+      #########################
+      #input3<-input2
+      #helper1statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1statistik<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1statistik<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1statistik<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1statistik<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      input3<-input2[format(helper1statistik,"%Y")%in%input$statistik1&input2$ORD_MATERIAL%in%input$statistik2.2,]
+
+      alle_bakterien<-input2$RES_ERREGER
+      alle_bakterien<-alle_bakterien[format(helper1,"%Y")%in%input$statistik1&input2$ORD_FACHBEREICH%in%input$statistik3&input2$ORD_MATERIAL%in%input$statistik2.2]
+
+      alle_bakterien_table<-table(alle_bakterien)
+      bakterien_helper<-names(alle_bakterien_table)[as.numeric(alle_bakterien_table)>=30]
+      if(length(bakterien_helper)==0){
+        shinyjs::html("text", paste0("<br>Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle).<br><br>"), add = TRUE) 
+        
+        output$text_zusammenfassung0<-renderText({"Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle)."})
+        output$text_zusammenfassung02<-renderText({"Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle)."})
+        
+        output$datatables_statistik <- renderUI({
+          datatables_statistik_output_list <- lapply(1:length(names(alle_bakterien_table)), function(k) {
+            datatablesname_statistik <- paste("datatables_statistik", k, sep="")
+            dataTableOutput(datatablesname_statistik)
+          })
+          do.call(tagList, datatables_statistik_output_list)
+        })
+        
+        for(n in 1:length(names(alle_bakterien_table))){
+          local({
+            my_i <- n
+            datatablesname_statistik <- paste("datatables_statistik", my_i, sep="")
+            output[[datatablesname_statistik]] <- renderDataTable({NULL})
+        })
+        }
+        
+        output$plots_statistik <- renderUI({
+          plot_statistik_output_list <- lapply(1:length(names(alle_bakterien_table)), function(k) {
+            plotname_statistik <- paste("plot_statistik", k, sep="")
+            plotOutput(plotname_statistik, height = 1000, width = 1000)
+          })
+          do.call(tagList, plot_statistik_output_list)
+        })
+        
+        for(n in 1:length(names(alle_bakterien_table))){
+          local({
+            my_i <- n
+            plotname_statistik <- paste("plot_statistik", my_i, sep="")
+            output[[plotname_statistik]] <- renderPlot({NULL})
+          })
+        }
+        
+        progress$close()
+        return()
+      }
+      
+      
+      
+      
+
+      ############################################
+      zusammenfassung_erstellen<-"Nein"
+      if(zusammenfassung_erstellen=="Ja"){
+        shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbspErstelle Zusammenfassung Kliniken/Fachbereiche","<br>"), add = TRUE)  
+
+        #output$text_zusammenfassung1b<-renderText({"Zusammenfassung Kliniken/Fachbereiche"})
+        
+        ab_spalten<-grep("_",names(input3),invert = T)
+        temp<-cbind(input3$ORD_FACHBEREICH,input3$RES_ERREGER,input3[,ab_spalten])
+        table_fach_bak<-as.data.frame(cbind(names(table(input3$ORD_FACHBEREICH)),
+                                            table(input3$ORD_FACHBEREICH,input3$RES_ERREGER)))
+        row.names(table_fach_bak)<-NULL
+        names(table_fach_bak)[1]<-"Klinik/Fachbereich"
+        for(i in 2:length(table_fach_bak[1,])){
+          table_fach_bak[,i]<-as.numeric(table_fach_bak[,i])
+        }
+        table_fach_bak$Summe<-rowSums(table_fach_bak[,c(2:length(table_fach_bak[1,]))])
+        helper<-table_fach_bak[1,]
+        helper[1,1]<-"Summe"
+        helper[1,2:length(helper[1,])]<-colSums(table_fach_bak[,c(2:length(table_fach_bak[1,]))])
+        table_fach_bak<-rbind(table_fach_bak,helper)
+       
+        #output$text_zusammenfassung1<-renderText({NULL})
+        #output$table_dt1 <- renderDataTable(datatable(table_fach_bak,rownames=F,
+        #                                              extensions = 'Buttons', options = list(
+        #                                                dom = 'Blfrtip',
+        #                                                buttons = c('csv', 'excel', 'print'))),
+        #                                    server=F
+        #)
+        
+        shinyjs::html("text", paste0("&nbsp&nbsp&nbspErstelle Zusammenfassung Antibiotika","<br>"), add = TRUE)  
+        
+        temp2<-temp
+        ab_names<-names(input3)[ab_spalten]
+        for(i in ab_names){
+          temp2[temp2[,i==names(temp2)]!="-",i==names(temp2)]<-i
+          temp2[temp2[,i==names(temp2)]=="-",i==names(temp2)]<-NA
+        }
+        
+        names(temp2)[1:2]<-c("ORD_FACHBEREICH","RES_ERREGER")
+        table_anti_bak<-data.frame(Antibiotikum=ab_names)
+        erreger<-names(table(temp2$RES_ERREGER))
+        for(i in 1:length(erreger)){
+          table_anti_bak<-cbind(table_anti_bak,V1=0)
+        }
+        names(table_anti_bak)<-c("Antibiotikum",erreger)
+        for(i in erreger){
+          for(j in ab_names){
+            table_anti_bak[table_anti_bak$Antibiotikum==j,names(table_anti_bak)==i]<-sum(temp2[temp2$RES_ERREGER==i,names(temp2)==j]==j,na.rm=T)
+          }
+        }
+        
+        table_anti_bak$Summe<-rowSums(table_anti_bak[,c(2:length(table_anti_bak[1,]))])
+        helper<-table_anti_bak[1,]
+        helper[1,1]<-"Summe"
+        helper[1,2:length(helper[1,])]<-colSums(table_anti_bak[,c(2:length(table_anti_bak[1,]))])
+        table_anti_bak<-rbind(table_anti_bak,helper)
+        
+        #output$text_zusammenfassung2<-renderText({NULL})
+        #output$table_dt2 <- renderDataTable(datatable(table_anti_bak,rownames=F,
+        #                                              extensions = 'Buttons', options = list(
+        #                                                dom = 'Blfrtip',
+        #                                                buttons = c('csv', 'excel', 'print'))),
+        #                                    server=F
+        #)
+      }
+      
+      #########################################
+      ##Statistik
+      ########################################
+      shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbspErstelle Resistenzstatistik","<br>"), add = TRUE) 
+
+      input4<-input3[input3$ORD_FACHBEREICH%in%input$statistik3,]
+
+      helper4statistik<-as.Date(input4$ORD_DATUM,format = "%d.%m.%Y")
+      
+      #if(input$statistik2.2=="Alle"){
+      #  bakterien_helper<-unique(input4$RES_ERREGER[format(helper4statistik,"%Y")==input$statistik1])
+      #}else{
+      #  bakterien_helper<-unique(input4$RES_ERREGER[format(helper4statistik,"%Y")==input$statistik1&input4$ORD_MATERIAL==input$statistik2.2])
+      #}
+
+      #bakterien_helper<-bakterien_helper[order(bakterien_helper)]
+      
+
+      table_fb_anti_bak_all<-list()
+      eintrag_laenge<-c()
+      for(erreger in 1:length(bakterien_helper)){
+        progress$inc(1/(length(bakterien_helper)+4))#,detail=bakterien_helper[erreger])
+        input4b<-input4[input4$RES_ERREGER==bakterien_helper[erreger],]
+        
+        ab_spalten<-grep("_",names(input4b),invert = T)
+        ab_names<-names(input4b)[ab_spalten]
+        table_fb_anti_bak<-data.frame(Antibiotikum=ab_names,N=NA,S=NA,I=NA,R=NA,KI_R=NA)
+        
+        for(j in ab_names){
+          table_fb_anti_bak[table_fb_anti_bak$Antibiotikum==j,3]<-sum(input4b[,names(input4b)==j]=="S")
+          table_fb_anti_bak[table_fb_anti_bak$Antibiotikum==j,4]<-sum(input4b[,names(input4b)==j]=="I")
+          table_fb_anti_bak[table_fb_anti_bak$Antibiotikum==j,5]<-sum(input4b[,names(input4b)==j]=="R")
+        }
+        table_fb_anti_bak[,2]<-rowSums(table_fb_anti_bak[,3:5])
+        
+        for(j in 1:length(table_fb_anti_bak[,1])){
+          if(table_fb_anti_bak[j,2]>0){
+            stat_help1<-format(round(100*binom.test(x=table_fb_anti_bak[j,5],n=table_fb_anti_bak[j,2],
+                                                    p=table_fb_anti_bak[j,5]/table_fb_anti_bak[j,2])$conf.int[1],1),nsmall=1)
+            stat_help2<-format(round(100*binom.test(x=table_fb_anti_bak[j,5],n=table_fb_anti_bak[j,2],
+                                                    p=table_fb_anti_bak[j,5]/table_fb_anti_bak[j,2])$conf.int[2],1),nsmall=1)
+            table_fb_anti_bak[j,6]<-paste0(stat_help1," - ",stat_help2)          
+          }
+        }
+        table_fb_anti_bak[,3]<-format(round(100*table_fb_anti_bak[,3]/table_fb_anti_bak[,2],1),nsmall=1)
+        table_fb_anti_bak[,4]<-format(round(100*table_fb_anti_bak[,4]/table_fb_anti_bak[,2],1),nsmall=1)
+        table_fb_anti_bak[,5]<-format(round(100*table_fb_anti_bak[,5]/table_fb_anti_bak[,2],1),nsmall=1)
+        
+        
+        table_fb_anti_bak<-table_fb_anti_bak[!is.na(table_fb_anti_bak[,6]),]
+        names(table_fb_anti_bak)<-c("Antibiotikum","N","S %","I %","R %","95% KI R")
+        
+        table_fb_anti_bak<-table_fb_anti_bak[table_fb_anti_bak$N>=30,]
+        table_fb_anti_bak<-table_fb_anti_bak[order(table_fb_anti_bak[,1],decreasing = F),]
+        table_fb_anti_bak<-table_fb_anti_bak[order(table_fb_anti_bak[,3],decreasing = T),]
+        eintrag_laenge[erreger]<-length(table_fb_anti_bak[,1])
+        table_fb_anti_bak_all[[erreger]]<-table_fb_anti_bak
+      }
+      
+      
+      output$text_zusammenfassung0<-renderText({NULL})
+      
+      #if(input$statistik2!="Alle"){
+        bakterien_update<-bakterien_helper[bakterien_helper%in%input$statistik2]
+        eintrag_laenge_update<-eintrag_laenge[bakterien_helper%in%input$statistik2]
+      #}else{
+      #  bakterien_update<-bakterien_helper
+      #  eintrag_laenge_update<-eintrag_laenge
+      #}
+
+      output$datatables_statistik <- renderUI({
+        datatables_statistik_output_list <- lapply(1:length(bakterien_update), function(k) {
+          datatablesname_statistik <- paste("datatables_statistik", k, sep="")
+          dataTableOutput(datatablesname_statistik)
+        })
+        do.call(tagList, datatables_statistik_output_list)
+      })
+      
+      for(n in 1:length(bakterien_update)){
+        local({
+          my_i <- n
+          datatablesname_statistik <- paste("datatables_statistik", my_i, sep="")
+          output[[datatablesname_statistik]] <- renderDataTable({datatable(table_fb_anti_bak_all[[which(bakterien_update[my_i]==bakterien_helper)]],
+                                                                           caption = htmltools::tags$caption(bakterien_update[my_i], style="color:rgb(49,126,172);font-size: 14pt"),
+                                                                           rownames=F,extensions = 'Buttons', 
+                                                                           options = list(columnDefs = list(list(className = 'dt-right', targets = 2:5))))},
+                                                                server=F)
+        })
+      }
+
+      progress$inc(1/(length(bakterien_helper)+4))
+      progress$inc(1/(length(bakterien_helper)+4))
+
+      output$text_zusammenfassung02<-renderText({NULL})
+      
+      
+      output$plots_statistik <- renderUI({
+        plot_statistik_output_list <- lapply(1:length(bakterien_update), function(k) {
+          plotname_statistik <- paste("plot_statistik", k, sep="")
+          plotOutput(plotname_statistik, height = (200+50*eintrag_laenge_update[k]), width = 1000)
+        })
+        do.call(tagList, plot_statistik_output_list)
+      })
+      
+      for(n in 1:length(bakterien_update)){
+        local({
+          my_i <- n
+          plotname_statistik <- paste("plot_statistik", my_i, sep="")
+          output[[plotname_statistik]] <- renderPlot({
+            help_bar<-table_fb_anti_bak_all[[which(bakterien_update[my_i]==bakterien_helper)]][order(table_fb_anti_bak_all[[which(bakterien_update[my_i]==bakterien_helper)]][,1],decreasing = T),]
+            help_bar<-help_bar[order(help_bar[,3],decreasing = F),]
+            
+            par(mar=c(4,14,6,1))
+            barplot(t(as.matrix(help_bar[,5])),names.arg=help_bar[,1],horiz=T,las=1,main="",col="darkgoldenrod2",space = 0.5,border = "darkgoldenrod4",xlim = c(0,100))
+            for(m in 1:length(help_bar[,1])){
+              start<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][1])
+              end<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][2])
+              points(x=c(start,end),y=c(m*1.5-0.5,m*1.5-0.5),type="l",lwd=2)
+              points(x=c(start,start),y=c(m*1.5-0.4,m*1.5-0.6),type="l",lwd=3)
+              points(x=c(end,end),y=c(m*1.5-0.4,m*1.5-0.6),type="l",lwd=3)
+              for(n in seq(10,100,10)){
+                points(x=c(n,n),y=c(m*1.5,m*1.5-1),col="grey90",type="l")
+              }
+            }
+            points(x=c(0,100),y=c(length(help_bar[,1])*1.5+0.025*length(help_bar[,1]),length(help_bar[,1])*1.5+0.025*length(help_bar[,1])),
+                   col="grey90",lwd=3,type="l")
+            title("R %    95% KI R",line = 0)
+            mtext(bakterien_update[my_i],adj=-0.17,cex=1.5,col=rgb(49/255,126/255,172/255),line=2)
+            
+          })
+
+        })
+      }
+      
+      progress$inc(1/(length(bakterien_helper)+4))
+      progress$inc(1/(length(bakterien_helper)+4))
+      
+      
+      progress$close()
+      shinyjs::html("text", paste0("<br><br>","Statistische Analyse von ",
+                                   length(bakterien_update)," Spezies erfolgreich durchgeführt.","<br>"), add = TRUE)  
+      shinyjs::html("text", paste0("<br>","Hinweis:"),add=TRUE)
+      shinyjs::html("text",paste0("<br>","Pro Spezies werden nur die Antibiotika berichtet, für die min. 30 Beobachtungen vorliegen."), add = TRUE)  
+
+      })
+    
+    output$do_statistik_xlsx <- downloadHandler(
+      filename = function() {
+        if(length(input$statistik1)==1&&length(input$statistik2.2)==1&&
+           length(input$statistik3)==1&&length(input$statistik2)==1){
+          paste0("Resistenzstatistik_",input$statistik1,"_Material_",input$statistik2.2,"_Klinik_",input$statistik3,"_Spezies_",input$statistik2,".xlsx")
+        }else{
+          paste0("Resistenzstatistik_", Sys.Date(), ".xlsx")
+        }
+        #"Test.xlsx"
+      },
+      content = function(file) {
+        progress <- shiny::Progress$new()
+        progress$set(message = "Vorbereitung Daten xlsx-Report", value = 0)
+
+        #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+        #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+        if(input$statistik3c==T){
+          input2<-input2[input2$X_STATUS>0,]
+        }
+        
+        #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        years<-unique(format(helper1,"%Y"))
+        
+        shinyjs::html("text", paste0("<br>Statistische Analyse wird gestartet.<br><br>"), add = FALSE)
+        
+        #########################
+        ###Eigentliche Analyse###
+        #########################
+        
+        #########################################
+        ##Statistik
+        ########################################
+        shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbspxlsx-Report wird generiert","<br>"), add = TRUE) 
+
+        #helper1statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1statistik<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1statistik<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1statistik<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1statistik<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        input3<-input2[format(helper1statistik,"%Y")%in%input$statistik1&input2$ORD_MATERIAL%in%input$statistik2.2,]
+        input4<-input3[input3$ORD_FACHBEREICH%in%input$statistik3,]
+
+        #helper4statistik<-as.Date(input4$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper4statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper4statistik<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper4statistik<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper4statistik<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper4statistik<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper4statistik<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        #bakterien_helper<-unique(input4$RES_ERREGER[format(helper4statistik,"%Y")==input$statistik1])
+        #bakterien_helper<-bakterien_helper[order(bakterien_helper)]
+        
+        alle_bakterien<-input2$RES_ERREGER
+        alle_bakterien<-alle_bakterien[format(helper1,"%Y")%in%input$statistik1&input2$ORD_FACHBEREICH%in%input$statistik3&input2$ORD_MATERIAL%in%input$statistik2.2]
+
+        alle_bakterien_table<-table(alle_bakterien)
+        bakterien_helper<-names(alle_bakterien_table)[as.numeric(alle_bakterien_table)>=30]
+        if(length(bakterien_helper)==0){
+          shinyjs::html("text", paste0("<br>Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration.<br><br>"), add = TRUE) 
+          progress$close()
+          return()
+        }
+        
+        
+        table_fb_anti_bak_all<-list()
+        eintrag_laenge<-c()
+        for(erreger in 1:length(bakterien_helper)){
+          progress$inc(1/(length(bakterien_helper)))
+          input4b<-input4[input4$RES_ERREGER==bakterien_helper[erreger],]
+
+          ab_spalten<-grep("_",names(input4b),invert=T)
+          ab_names<-names(input4b)[ab_spalten]
+          table_fb_anti_bak<-data.frame(Antibiotikum=ab_names,N=NA,S=NA,I=NA,R=NA,KI_R=NA)
+          
+          for(j in ab_names){
+            table_fb_anti_bak[table_fb_anti_bak$Antibiotikum==j,3]<-sum(input4b[,names(input4b)==j]=="S")
+            table_fb_anti_bak[table_fb_anti_bak$Antibiotikum==j,4]<-sum(input4b[,names(input4b)==j]=="I")
+            table_fb_anti_bak[table_fb_anti_bak$Antibiotikum==j,5]<-sum(input4b[,names(input4b)==j]=="R")
+          }
+          table_fb_anti_bak[,2]<-rowSums(table_fb_anti_bak[,3:5])
+          
+          for(j in 1:length(table_fb_anti_bak[,1])){
+            if(table_fb_anti_bak[j,2]>0){
+              stat_help1<-format(round(100*binom.test(x=table_fb_anti_bak[j,5],n=table_fb_anti_bak[j,2],
+                                                      p=table_fb_anti_bak[j,5]/table_fb_anti_bak[j,2])$conf.int[1],1),nsmall=1)
+              stat_help2<-format(round(100*binom.test(x=table_fb_anti_bak[j,5],n=table_fb_anti_bak[j,2],
+                                                      p=table_fb_anti_bak[j,5]/table_fb_anti_bak[j,2])$conf.int[2],1),nsmall=1)
+              table_fb_anti_bak[j,6]<-paste0(stat_help1," - ",stat_help2)          
+            }
+          }
+          table_fb_anti_bak[,3]<-format(round(100*table_fb_anti_bak[,3]/table_fb_anti_bak[,2],1),nsmall=1)
+          table_fb_anti_bak[,4]<-format(round(100*table_fb_anti_bak[,4]/table_fb_anti_bak[,2],1),nsmall=1)
+          table_fb_anti_bak[,5]<-format(round(100*table_fb_anti_bak[,5]/table_fb_anti_bak[,2],1),nsmall=1)
+          
+          
+          table_fb_anti_bak<-table_fb_anti_bak[!is.na(table_fb_anti_bak[,6]),]
+          names(table_fb_anti_bak)<-c("Antibiotikum","N","S %","I %","R %","95% KI R")
+          table_fb_anti_bak<-table_fb_anti_bak[table_fb_anti_bak$N>=30,]
+          table_fb_anti_bak<-table_fb_anti_bak[order(table_fb_anti_bak[,1],decreasing = F),]
+          table_fb_anti_bak<-table_fb_anti_bak[order(table_fb_anti_bak[,3],decreasing = T),]
+          eintrag_laenge[erreger]<-length(table_fb_anti_bak[,1])
+          table_fb_anti_bak_all[[erreger]]<-table_fb_anti_bak
+          
+          
+        }
+        progress$close()
+        
+        
+        progress <- shiny::Progress$new()
+        progress$set(message = "Generiere Daten xlsx-Report", value = 0)
+        
+        wb<-createWorkbook()
+        addWorksheet(wb,sheetName = "Datenblatt Antibiotika")
+        
+        table_export<-data.frame(V1=NA,V2=NA,V3=NA,V4=NA,V5=NA,V6=NA,V7=NA)
+        table_export[2,1]<-"Resistenzstatistik"
+        table_export[3,1]<-"Jahr"
+        table_export[3,2]<-paste0(input$statistik1,collapse = " + ")
+        table_export[4,1]<-"Material"
+        table_export[4,2]<-paste0(input$statistik2.2,collapse = " + ")
+        table_export[5,1]<-"Klinik/Fachbereich"
+        table_export[5,2]<-paste0(input$statistik3,collapse = " + ")
+        table_export[6,1]<-"Patienten-Isolate"
+        table_export[6,2]<-paste0(ifelse(input$statistik3c==F,"Alle","Ausschließlich 1."))
+        table_export[7,1]<-"Spezies"
+        table_export[7,2]<-paste0(input$statistik2,collapse = ", ")
+        
+        insertImage(wb,sheet="Datenblatt Antibiotika",file = "www/UKM.png",
+                    height = 0.516, width = 0.6,
+                    startRow = 1,startCol = 1)
+        
+        writeData(wb,sheet="Datenblatt Antibiotika",table_export,colNames = F,rowNames = F)
+        all_white<-createStyle(fgFill="white")
+        bold<-createStyle(textDecoration = "bold")
+        size<-createStyle(fontSize = 10)
+        size_big<-createStyle(fontSize = 14)
+        linie<-createStyle(border = "bottom",borderColour = "grey85")
+        linie2<-createStyle(border = "bottom",borderStyle = "medium")
+        linie3<-createStyle(border = "bottom",borderStyle = "medium",borderColour = "grey85")
+        right<-createStyle(halign = "right")
+        hintergrund_grau<-createStyle(fgFill="grey90")
+        ueberschrift<-createStyle(fontColour = "white",fgFill = rgb(42/255,77/255,125/255),
+                                  fontSize = 14,textDecoration = "bold",valign = "center")
+        
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=c(1:3600),cols=1:27,
+                 gridExpand = T,style=all_white)
+        
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=2,cols=1:7,style = ueberschrift,stack=T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=c(3:7),cols=1,style = bold,stack=T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=c(7),cols=1:7,style = linie,
+                 gridExpand = T, stack=T)
+        
+        zeilenbruch <- createStyle(wrapText = TRUE)
+        addStyle(wb,sheet="Datenblatt Antibiotika",zeilenbruch,rows=5,cols=2,stack=T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",zeilenbruch,rows=7,cols=2,stack=T)
+        
+        topalign <- createStyle(valign="top")
+        
+        setColWidths(wb,sheet="Datenblatt Antibiotika",cols = c(1:6),widths = "auto")
+        
+        maxlength<-max(strwidth(table_export[3,2], unit = "in") * 11.2838 ,
+                       strwidth(table_export[4,2], unit = "in") * 11.2838 ,
+                       strwidth(table_export[5,2], unit = "in") * 11.2838 ,
+                       strwidth(table_export[7,2], unit = "in") * 11.2838 )
+       
+        setColWidths(wb,sheet="Datenblatt Antibiotika",cols = c(2),widths = min(120,maxlength))
+        
+        if((strwidth(table_export[3,2], unit = "in") * 11.2838)>120){
+          setRowHeights(wb,sheet="Datenblatt Antibiotika",rows = c(3),
+                        heights = c(13+11.05*(floor((strwidth(table_export[3,2], unit = "in") * 11.2838)/120))))
+          addStyle(wb,sheet="Datenblatt Antibiotika",topalign,rows=3,cols=1,stack=T)
+        }
+        if((strwidth(table_export[4,2], unit = "in") * 11.2838)>120){
+          setRowHeights(wb,sheet="Datenblatt Antibiotika",rows = c(4),
+                        heights = c(13+11.05*(floor((strwidth(table_export[4,2], unit = "in") * 11.2838)/120))))
+          addStyle(wb,sheet="Datenblatt Antibiotika",topalign,rows=4,cols=1,stack=T)
+        }        
+        if((strwidth(table_export[5,2], unit = "in") * 11.2838)>120){
+          setRowHeights(wb,sheet="Datenblatt Antibiotika",rows = c(5),
+                        heights = c(13+11.05*(floor((strwidth(table_export[5,2], unit = "in") * 11.2838)/120))))
+          addStyle(wb,sheet="Datenblatt Antibiotika",topalign,rows=5,cols=1,stack=T)
+        }        
+        if((strwidth(table_export[7,2], unit = "in") * 11.2838)>120){
+          setRowHeights(wb,sheet="Datenblatt Antibiotika",rows = c(7),
+                        heights = c(13+11.05*(floor((strwidth(table_export[7,2], unit = "in") * 11.2838)/120))))
+          addStyle(wb,sheet="Datenblatt Antibiotika",topalign,rows=7,cols=1,stack=T)
+        }
+        
+        setRowHeights(wb,sheet="Datenblatt Antibiotika",rows = c(2,8),heights = 30)
+        setRowHeights(wb,sheet="Datenblatt Antibiotika",rows = 1,heights = 43)
+        
+        addWorksheet(wb,sheetName = "Grafiken Antibiotika")
+        
+        addStyle(wb,sheet="Grafiken Antibiotika",rows=c(1:5000),cols=1:27,
+                 gridExpand = T,style=all_white)
+
+        insertImage(wb,sheet="Grafiken Antibiotika",file = "www/UKM.png",
+                    height = 0.516, width = 0.6,
+                    startRow = 1,startCol = 1)
+        setRowHeights(wb,sheet="Grafiken Antibiotika",rows = 1,heights = 43)
+        
+        
+        ##############################################
+        #if(input$statistik2!="Alle"){
+          bakterien_update<-bakterien_helper[bakterien_helper%in%input$statistik2]
+          eintrag_laenge_update<-eintrag_laenge[bakterien_helper%in%input$statistik2]
+        #}else{
+        #  bakterien_update<-bakterien_helper
+        #  eintrag_laenge_update<-eintrag_laenge
+        #}
+        
+        beginn<-9
+        table_export_all<-data.frame(V1=NA,V2=NA,V3=NA,V4=NA,V5=NA,V6=NA,V7=NA)
+        rows_daten1<-c()
+        rows_daten2<-c()
+        rows_daten3<-c()
+        rows_daten4<-c()
+        rows_daten5<-c()
+        rows_daten6<-c()
+        rows_daten7<-c()
+        rows_daten8<-c()
+        export_abbildungen<-data.frame(V1=NA)
+        add_height<-0
+        for(erreger in (1:length(bakterien_update))){
+          progress$inc(1/(length(bakterien_update)),detail=paste0(erreger,"/",length(bakterien_update)))
+          
+          table_export<-data.frame(V1=NA,V2=NA,V3=NA,V4=NA,V5=NA,V6=NA,V7=NA)
+          
+          table_export[1,1]<-bakterien_update[erreger]
+          table_export[2,]<-c(names(table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]])[1],"",names(table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]])[2:6])
+          table_export[3:(2+length(table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][,1])),1]<-table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][,1]
+          table_export[3:(2+length(table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][,1])),3:7]<-table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][,2:6]
+          table_export[(3+length(table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][,1])),1:7]<-NA
+          
+          table_export_all<-rbind(table_export_all,table_export)
+          
+          rows_daten1<-c(rows_daten1,c((beginn+1):(beginn-2+length(table_export[,1]))))
+          rows_daten2<-c(rows_daten2,(beginn+1))
+          rows_daten3<-c(rows_daten3,c(beginn:(beginn+1)))
+          rows_daten4<-c(rows_daten4,(beginn+1))
+          rows_daten5<-c(rows_daten5,c(beginn:(beginn-1+length(table_export[,1]))))
+          rows_daten6<-c(rows_daten6,c((beginn+1):(beginn-1+length(table_export[,1]))))
+          rows_daten7<-c(rows_daten7,c(beginn:(beginn-1+length(table_export[,1]))))
+          rows_daten8<-c(rows_daten8,c((beginn),(beginn-2+length(table_export[,1]))))
+          
+          beginn<-beginn+length(table_export[,1])
+          
+          #export_abbildungen[3+0.04*(200+50*eintrag_laenge_update[erreger])*(erreger-1),1]<-bakterien_update[erreger]
+          export_abbildungen[3+add_height,1]<-bakterien_update[erreger]
+          #message("Text: ",3+add_height)
+          add_height<-add_height+(40/7.8)*(7.8/1000*(300+50*eintrag_laenge_update[erreger]))
+        }
+        
+        writeData(wb,sheet="Datenblatt Antibiotika",table_export_all,colNames = F,rowNames = F,startRow = 8)
+        
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=rows_daten1,cols=1:7,style = linie,gridExpand = T, stack=T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=rows_daten2,cols=1:7,style = hintergrund_grau,stack=T,gridExpand = T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",cols=c(1:7),rows=rows_daten3,style=bold,stack=T,gridExpand = T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",cols=c(1:7),rows=rows_daten4,style=linie2,gridExpand = T,stack = T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=rows_daten5,cols=c(2:7),gridExpand = T,stack=T,style=right)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=rows_daten6,cols=c(2:7),gridExpand = T,style=size,stack = T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=rows_daten7,cols=c(6:7),gridExpand = T,style=bold,stack = T)
+        addStyle(wb,sheet="Datenblatt Antibiotika",rows=rows_daten8,cols=c(1:7),gridExpand = T,style=linie3,stack = T)
+        
+        
+        writeData(wb,sheet="Grafiken Antibiotika",export_abbildungen,colNames = F,rowNames = F)
+        addStyle(wb,sheet="Grafiken Antibiotika",cols=c(1),rows=1:length(export_abbildungen[,1]),style=bold,stack=T)
+        addStyle(wb,sheet="Grafiken Antibiotika",cols=c(1),rows=1:length(export_abbildungen[,1]),style=size_big,stack=T)
+        
+        progress$close()
+        
+        progress <- shiny::Progress$new()
+        progress$set(message = "Schreibe Daten xlsx-Report", value = 0)
+        add_height<-0
+        for(erreger in (1:length(bakterien_update))){
+          progress$inc(1/(length(bakterien_update)),detail=paste0(erreger,"/",length(bakterien_update)))
+          
+          help_bar<-table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][order(table_fb_anti_bak_all[[which(bakterien_update[erreger]==bakterien_helper)]][,1],decreasing = T),]
+          help_bar<-help_bar[order(help_bar[,3],decreasing = F),]
+          
+          png(paste0(tempdir(), "/", "plot",erreger,".png"), width=800, height=(300+50*eintrag_laenge_update[erreger]),units = "px")
+          par(mar=c(3,14,1,1))
+          barplot(t(as.matrix(help_bar[,5])),names.arg=help_bar[,1],horiz=T,las=1,main="R %    95% KI R",
+                  col="darkgoldenrod2",space = 0.5,border = "darkgoldenrod4",xlim = c(0,100))
+          for(m in 1:length(help_bar[,1])){
+            start<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][1])
+            end<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][2])
+            points(x=c(start,end),y=c(m*1.5-0.5,m*1.5-0.5),type="l",lwd=2)
+            points(x=c(start,start),y=c(m*1.5-0.4,m*1.5-0.6),type="l",lwd=3)
+            points(x=c(end,end),y=c(m*1.5-0.4,m*1.5-0.6),type="l",lwd=3)
+            
+            for(n in seq(10,100,10)){
+              points(x=c(n,n),y=c(m*1.5,m*1.5-1),col="grey90",type="l")
+            }
+          }
+          points(x=c(0,100),y=c(length(help_bar[,1])*1.5+0.5,length(help_bar[,1])*1.5+0.5),col="grey90",lwd=3,type="l")
+          dev.off()
+          
+          #insertImage(wb, sheet="Grafiken Antibiotika", paste0(tempdir(), "/", "plot",erreger,".png"), width = 6.6,height = 7.8,
+          #            startRow = 4+40*(erreger-1),startCol = 1)
+          insertImage(wb, sheet="Grafiken Antibiotika", paste0(tempdir(), "/", "plot",erreger,".png"), width = 6.6,height = 7.8/1000*(300+50*eintrag_laenge_update[erreger]),
+                      startRow = 4+add_height,startCol = 1)
+          
+          #message("Bild: laenge bis ",7.8/1000*(200+50*eintrag_laenge_update[erreger]))
+          add_height<-add_height+(40/7.8)*(7.8/1000*(300+50*eintrag_laenge_update[erreger]))
+        }
+        
+        saveWorkbook(wb,file = file,overwrite=T)
+        
+        progress$close()
+        shinyjs::html("text", paste0("<br><br>","xlsx-Export erfolgreich generiert.","<br>"), add = TRUE) 
+      } 
+      
+    )
+    
+    observeEvent(input$do_trend,{
+      updateTabsetPanel(session,"main",
+                        selected="Trend-Analyse")
+      progress <- shiny::Progress$new()
+      progress$set(message = "Erstelle Trend-Analyse", value = 0)
+      
+      #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+      #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+      if(input$trend3c==T){
+        input2<-input2[input2$X_STATUS>0,]
+      }
+      #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years<-unique(format(helper1,"%Y"))
+      
+      shinyjs::html("text", paste0("<br>Trend-Analyse wird gestartet.<br><br>"), add = FALSE)
+      coxDF<-runBuildModel(input, output)    
+      
+      observe(output$text_zusammenfassung_trend <- renderText(HTML(rv$outputText3)))
+      
+      if(is.null(input$trend2)){
+        shinyjs::html("text", paste0("<br>Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle).<br><br>"), add = TRUE) 
+        output$text_trend2<-renderText({"Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle)"})
+        
+        output$plots_trend <- renderUI({
+          plot_trend_output_list <- lapply(1:1, function(k) {
+            plotname_trend <- paste("plot_trend", k, sep="")
+            plotOutput(plotname_trend, height = 1000, width = 1000)
+          })
+          do.call(tagList, plot_trend_output_list)
+        })
+        
+        for(n in 1:1){
+          local({
+            my_i <- n
+            plotname_trend <- paste("plot_trend", my_i, sep="")
+            output[[plotname_trend]] <- renderPlot({NULL})
+          })
+        }
+        
+        progress$close()
+        return()
+        
+      }
+      
+      if(!is.null(input$trend2)){
+        input_filter<-input2
+        input_filter<-input_filter[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2&input2$RES_ERREGER%in%input$trend2,]
+        helper_neu<-helper1[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2&input2$RES_ERREGER%in%input$trend2]
+        
+        all_years<-format(helper_neu,"%Y")
+        
+        #if(input$trend2.3=="Alle"){##Alle möglichen AB
+          temp_ab<-apply(input_filter[,grep("_",names(input_filter),fixed=T,invert = T)],2,function(x){sum(x!="-")})
+          temp_ab<-temp_ab[temp_ab>0]
+          temp_ab_namen<-names(temp_ab)
+          temp_ab_namen_final<-c()
+          
+          for(ab_relevant in temp_ab_namen){
+            for(year_is in unique(all_years)){
+              temp_ab_test<-input_filter[all_years==year_is,names(input_filter)==ab_relevant]
+              if(sum(temp_ab_test!="-")>=30){
+                temp_ab_namen_final<-c(temp_ab_namen_final,ab_relevant)
+              }
+            }
+          }
+          temp_ab_namen_final<-unique(temp_ab_namen_final)
+          temp_ab_namen_final<-temp_ab_namen_final[order(temp_ab_namen_final)]
+          temp_ab_namen_final<-temp_ab_namen_final[temp_ab_namen_final%in%input$trend2.3]
+          input_filter<-input_filter[,c(grep("_",names(input_filter),fixed=T),which(names(input_filter)%in%temp_ab_namen_final))]
+        #}
+        #if(input$trend2.3!="Alle"){
+        #  input_filter<-input_filter[,c(grep("_",names(input_filter),fixed=T),which(names(input_filter)%in%input$trend2.3))]
+        #  temp_ab_namen_final<-input$trend2.3
+        #}
+        
+        output$text_trend2<-renderText({NULL})
+
+        #########################################
+        ##Statistik
+        ########################################
+
+        table_anti_bak_all<-list()
+        eintrag_laenge_ab<-c()
+        for(ab in 1:length(temp_ab_namen_final)){
+          progress$inc(1/(length(temp_ab_namen_final)))
+          table_anti_bak<-data.frame(Antibiotikum=rep(temp_ab_namen_final[ab],length(unique(all_years))),N=NA,S=NA,I=NA,R=NA,KI_R=NA,Year=NA)
+
+          count_years<-1
+          for(is_year in unique(all_years)){
+            table_anti_bak[count_years,3]<-sum(input_filter[is_year==all_years,names(input_filter)==temp_ab_namen_final[ab]]=="S")
+            table_anti_bak[count_years,4]<-sum(input_filter[is_year==all_years,names(input_filter)==temp_ab_namen_final[ab]]=="I")
+            table_anti_bak[count_years,5]<-sum(input_filter[is_year==all_years,names(input_filter)==temp_ab_namen_final[ab]]=="R")
+            table_anti_bak[count_years,7]<-is_year
+            count_years<-count_years+1
+          }
+          table_anti_bak[,2]<-rowSums(table_anti_bak[,3:5])
+          for(j in 1:length(table_anti_bak[,1])){
+            if(table_anti_bak[j,2]>0){
+              stat_help1<-format(round(100*binom.test(x=table_anti_bak[j,5],n=table_anti_bak[j,2],
+                                                      p=table_anti_bak[j,5]/table_anti_bak[j,2])$conf.int[1],1),nsmall=1)
+              stat_help2<-format(round(100*binom.test(x=table_anti_bak[j,5],n=table_anti_bak[j,2],
+                                                      p=table_anti_bak[j,5]/table_anti_bak[j,2])$conf.int[2],1),nsmall=1)
+              table_anti_bak[j,6]<-paste0(stat_help1," - ",stat_help2)          
+            }
+          }
+            
+          table_anti_bak[,3]<-format(round(100*table_anti_bak[,3]/table_anti_bak[,2],1),nsmall=1)
+          table_anti_bak[,4]<-format(round(100*table_anti_bak[,4]/table_anti_bak[,2],1),nsmall=1)
+          table_anti_bak[,5]<-format(round(100*table_anti_bak[,5]/table_anti_bak[,2],1),nsmall=1)
+            
+          table_anti_bak<-table_anti_bak[!is.na(table_anti_bak[,6]),]
+          names(table_anti_bak)<-c("Antibiotikum","N","S %","I %","R %","95% KI R","Year")
+          
+          table_anti_bak<-table_anti_bak[table_anti_bak$N>=30,]
+          eintrag_laenge_ab[ab]<-length(table_anti_bak[,1])
+          table_anti_bak_all[[ab]]<-table_anti_bak
+        }
+          
+        output$plots_trend <- renderUI({
+          plot_trend_output_list <- lapply(1:length(temp_ab_namen_final), function(k) {
+            plotname_trend <- paste("plot_trend", k, sep="")
+            plotOutput(plotname_trend, height = 400, width = 1000)
+          })
+          do.call(tagList, plot_trend_output_list)
+        })
+        
+        for(n in 1:length(temp_ab_namen_final)){
+          local({
+            my_i <- n
+            plotname_trend <- paste("plot_trend", my_i, sep="")
+            output[[plotname_trend]] <- renderPlot({
+              help_bar<-table_anti_bak_all[[which(temp_ab_namen_final[my_i]==temp_ab_namen_final)]]
+              
+              par(mar=c(4,14,6,1))
+              plot(NULL,xlab="",ylab="",xaxt="n",yaxt="n",main="",bty="n",
+                   xlim=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),ylim=c(0,100),cex.lab=2,xaxs="i")
+              axis(1,at=seq(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),
+                   labels=c(NA,seq(min(as.numeric(all_years)),max(as.numeric(all_years))),NA),cex.axis=1.5,tick = F)
+              axis(2,at=seq(0,100,20),las=2,cex.axis=1.5)
+              for(n in seq(0,100,10)){
+                points(x=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),y=c(n,n),col="grey90",lwd=1,type="l",lty=5)
+              }
+              points(x=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),y=c(0,0),col="grey90",lwd=3,type="l",lty=1)
+              points(x=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),y=c(100,100),col="grey90",lwd=3,type="l",lty=1)
+              for(m in 1:length(help_bar[,1])){
+                start<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][1])
+                end<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][2])
+                points(x=c(as.numeric(help_bar$Year[m]),as.numeric(help_bar$Year[m])),y=c(start,end),type="l",lwd=2)
+                points(x=c(as.numeric(help_bar$Year[m])-0.02,as.numeric(help_bar$Year[m])+0.02),y=c(start,start),type="l",lwd=3)
+                points(x=c(as.numeric(help_bar$Year[m])-0.02,as.numeric(help_bar$Year[m])+0.02),y=c(end,end),type="l",lwd=3)
+              }
+              points(x=help_bar$Year,y=help_bar$`R %`,cex=3,type="l",lwd=5)
+              points(x=help_bar$Year,y=help_bar$`R %`,cex=2,pch=21,type="p",lwd=3,bg="darkgoldenrod2",col="darkgoldenrod4")
+
+              title("R %    95% KI R",line = 0.3)
+              mtext(help_bar$Antibiotikum[1],adj=-0.17,cex=1.5,col=rgb(49/255,126/255,172/255),line=2)
+            })
+          })
+        }
+        
+        shinyjs::html("text", paste0("<br><br>","Trend-Analyse erfolgreich durchgeführt.","<br>"), add = TRUE)  
+        shinyjs::html("text", paste0("<br>","Hinweis:"),add=TRUE)
+        shinyjs::html("text",paste0("<br>","Pro Antibiotikum werden nur die Jahre berichtet, für die min. 30 Beobachtungen vorliegen."), add = TRUE)  
+        output$hinweis_tabellen_trend<-renderText({"Hinweis: Pro Antibiotikum werden nur die Jahre berichtet, für die min. 30 Beobachtungen vorliegen."})
+        
+        progress$close()
+        return()
+      }
+    })
+      
+
+    output$do_trend_xlsx <- downloadHandler(
+      filename = function() {
+        if(length(input$trend2.2)==1&&length(input$trend3)==1&&
+           length(input$trend2)==1&&length(input$trend2.3)==1){
+          paste0("Trendanalyse_Material_",input$trend2.2,"_Klinik_",input$trend3,"_Spezies_",input$trend2,"_Antibiotikum_",input$trend2.3,".xlsx")
+        }else{
+          paste0("Trendanalyse_", Sys.Date(), ".xlsx")
+        }
+        #"Test.xlsx"
+      },
+      content = function(file) {
+        progress <- shiny::Progress$new()
+        progress$set(message = "Vorbereitung Daten xlsx-Report", value = 0)
+        
+        #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+        #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+        if(input$trend3c==T){
+          input2<-input2[input2$X_STATUS>0,]
+        }
+        
+        #helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        if(input$column4b=="dd.mm.yy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+        }
+        if(input$column4b=="dd.mm.yyyy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+        }
+        if(input$column4b=="mm/dd/yy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+        }
+        if(input$column4b=="mm/dd/yyyy"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+        }
+        if(input$column4b=="yy-mm-dd"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+        }
+        if(input$column4b=="yyyy-mm-dd"){
+          helper1<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+        }
+        years<-unique(format(helper1,"%Y"))
+        
+        shinyjs::html("text", paste0("<br>Analyse wird gestartet.<br><br>"), add = FALSE)
+        
+        #########################
+        ###Eigentliche Analyse###
+        #########################
+
+        if(is.null(input$trend2)){
+          shinyjs::html("text", paste0("<br>Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle).<br><br>"), add = TRUE) 
+          output$text_trend2<-renderText({"Nicht genügend Fälle für eine Analyse mit der gewählten Konfiguration (min. 30 Fälle)"})
+
+          progress$close()
+          return()
+        }
+        
+        if(!is.null(input$trend2)){
+          input_filter<-input2
+          input_filter<-input_filter[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2&input2$RES_ERREGER%in%input$trend2,]
+          helper_neu<-helper1[input2$ORD_FACHBEREICH%in%input$trend3&input2$ORD_MATERIAL%in%input$trend2.2&input2$RES_ERREGER%in%input$trend2]
+          
+          all_years<-format(helper_neu,"%Y")
+          
+          #if(input$trend2.3=="Alle"){##Alle möglichen AB
+            temp_ab<-apply(input_filter[,grep("_",names(input_filter),fixed=T,invert = T)],2,function(x){sum(x!="-")})
+            temp_ab<-temp_ab[temp_ab>0]
+            temp_ab_namen<-names(temp_ab)
+            temp_ab_namen_final<-c()
+            
+            for(ab_relevant in temp_ab_namen){
+              for(year_is in unique(all_years)){
+                temp_ab_test<-input_filter[all_years==year_is,names(input_filter)==ab_relevant]
+                if(sum(temp_ab_test!="-")>30){
+                  temp_ab_namen_final<-c(temp_ab_namen_final,ab_relevant)
+                }
+              }
+            }
+            temp_ab_namen_final<-unique(temp_ab_namen_final)
+            temp_ab_namen_final<-temp_ab_namen_final[order(temp_ab_namen_final)]
+            temp_ab_namen_final<-temp_ab_namen_final[temp_ab_namen_final%in%input$trend2.3]
+            input_filter<-input_filter[,c(grep("_",names(input_filter),fixed=T),which(names(input_filter)%in%temp_ab_namen_final))]
+          #}
+          #if(input$trend2.3!="Alle"){
+          #  input_filter<-input_filter[,c(grep("_",names(input_filter),fixed=T),which(names(input_filter)%in%input$trend2.3))]
+          #  temp_ab_namen_final<-input$trend2.3
+          #}
+          
+          #########################################
+          ##Statistik
+          ########################################
+          
+          table_anti_bak_all<-list()
+          eintrag_laenge_ab<-c()
+          for(ab in 1:length(temp_ab_namen_final)){
+            progress$inc(1/(length(temp_ab_namen_final)))
+            table_anti_bak<-data.frame(Antibiotikum=rep(temp_ab_namen_final[ab],length(unique(all_years))),N=NA,S=NA,I=NA,R=NA,KI_R=NA,Year=NA)
+            
+            count_years<-1
+            for(is_year in unique(all_years)){
+              table_anti_bak[count_years,3]<-sum(input_filter[is_year==all_years,names(input_filter)==temp_ab_namen_final[ab]]=="S")
+              table_anti_bak[count_years,4]<-sum(input_filter[is_year==all_years,names(input_filter)==temp_ab_namen_final[ab]]=="I")
+              table_anti_bak[count_years,5]<-sum(input_filter[is_year==all_years,names(input_filter)==temp_ab_namen_final[ab]]=="R")
+              table_anti_bak[count_years,7]<-is_year
+              count_years<-count_years+1
+            }
+            table_anti_bak[,2]<-rowSums(table_anti_bak[,3:5])
+            for(j in 1:length(table_anti_bak[,1])){
+              if(table_anti_bak[j,2]>0){
+                stat_help1<-format(round(100*binom.test(x=table_anti_bak[j,5],n=table_anti_bak[j,2],
+                                                        p=table_anti_bak[j,5]/table_anti_bak[j,2])$conf.int[1],1),nsmall=1)
+                stat_help2<-format(round(100*binom.test(x=table_anti_bak[j,5],n=table_anti_bak[j,2],
+                                                        p=table_anti_bak[j,5]/table_anti_bak[j,2])$conf.int[2],1),nsmall=1)
+                table_anti_bak[j,6]<-paste0(stat_help1," - ",stat_help2)          
+              }
+            }
+            
+            table_anti_bak[,3]<-format(round(100*table_anti_bak[,3]/table_anti_bak[,2],1),nsmall=1)
+            table_anti_bak[,4]<-format(round(100*table_anti_bak[,4]/table_anti_bak[,2],1),nsmall=1)
+            table_anti_bak[,5]<-format(round(100*table_anti_bak[,5]/table_anti_bak[,2],1),nsmall=1)
+            
+            table_anti_bak<-table_anti_bak[!is.na(table_anti_bak[,6]),]
+            names(table_anti_bak)<-c("Antibiotikum","N","S %","I %","R %","95% KI R","Year")
+            
+            table_anti_bak<-table_anti_bak[table_anti_bak$N>=30,]
+            eintrag_laenge_ab[ab]<-length(table_anti_bak[,1])
+            table_anti_bak_all[[ab]]<-table_anti_bak
+          }
+
+          progress$close()
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Schreibe Daten xlsx-Report", value = 0)
+          
+          wb<-createWorkbook()
+          addWorksheet(wb,sheetName = "Trend")
+          
+          all_white<-createStyle(fgFill="white")
+          bold<-createStyle(textDecoration = "bold")
+          size<-createStyle(fontSize = 10)
+          size_big<-createStyle(fontSize = 14)
+          linie<-createStyle(border = "bottom",borderColour = "grey85")
+          #linie2<-createStyle(border = "bottom",borderStyle = "medium")
+          #linie3<-createStyle(border = "bottom",borderStyle = "medium",borderColour = "grey85")
+          #right<-createStyle(halign = "right")
+          #hintergrund_grau<-createStyle(fgFill="grey90")
+          ueberschrift<-createStyle(fontColour = "white",fgFill = rgb(42/255,77/255,125/255),
+                                    fontSize = 14,textDecoration = "bold",valign = "center")
+          
+          addStyle(wb,sheet="Trend",rows=c(1:5000),cols=1:27,
+                   gridExpand = T,style=all_white)
+          
+          insertImage(wb,sheet="Trend",file = "www/UKM.png",
+                      height = 0.516, width = 0.6,
+                      startRow = 1,startCol = 1)
+          setRowHeights(wb,sheet="Trend",rows = 1,heights = 43)
+          
+          
+          table_export<-data.frame(V1=NA,V2=NA,V3=NA,V4=NA,V5=NA,V6=NA,V7=NA)
+          table_export[2,1]<-"Trendanalyse"
+          table_export[3,1]<-"Material"
+          table_export[3,2]<-paste0(input$trend2.2,collapse = " + ")
+          table_export[4,1]<-"Klinik/Fachbereich"
+          table_export[4,2]<-paste0(input$trend3,collapse = " + ")
+          table_export[5,1]<-"Patienten-Isolate"
+          table_export[5,2]<-paste0(ifelse(input$trend3c==F,"Alle","Ausschließlich 1."))
+          table_export[6,1]<-"Spezies"
+          table_export[6,2]<-input$trend2 
+          table_export[7,1]<-"Antibiotikum"
+          table_export[7,2]<-paste0(input$trend2.3,collapse = ", ")
+          
+          writeData(wb,sheet="Trend",table_export,colNames = F,rowNames = F)
+
+          addStyle(wb,sheet="Trend",rows=c(1:3600),cols=1:27,gridExpand = T,style=all_white)
+          addStyle(wb,sheet="Trend",rows=2,cols=1:7,style = ueberschrift,stack=T)
+          addStyle(wb,sheet="Trend",rows=c(3:7),cols=1,style = bold,stack=T)
+          addStyle(wb,sheet="Trend",rows=c(7),cols=1:7,style = linie,
+                   gridExpand = T, stack=T)
+          
+          zeilenbruch <- createStyle(wrapText = TRUE)
+          addStyle(wb,sheet="Trend",zeilenbruch,rows=4,cols=2,stack=T)
+          addStyle(wb,sheet="Trend",zeilenbruch,rows=7,cols=2,stack=T)
+          
+          topalign <- createStyle(valign="top")
+          
+          setColWidths(wb,sheet="Trend",cols = c(1:5),widths = "auto")
+          
+          maxlength<-max(strwidth(table_export[3,2], unit = "in") * 11.2838 ,
+                         strwidth(table_export[4,2], unit = "in") * 11.2838 ,
+                         strwidth(table_export[7,2], unit = "in") * 11.2838 )
+          
+          setColWidths(wb,sheet="Trend",cols = c(2),widths = min(120,maxlength))
+          
+          if((strwidth(table_export[3,2], unit = "in") * 11.2838)>120){
+            setRowHeights(wb,sheet="Trend",rows = c(3),
+                          heights = c(13+11.05*(floor((strwidth(table_export[3,2], unit = "in") * 11.2838)/120))))
+            addStyle(wb,sheet="Trend",topalign,rows=3,cols=1,stack=T)
+          }
+          if((strwidth(table_export[4,2], unit = "in") * 11.2838)>120){
+            setRowHeights(wb,sheet="Trend",rows = c(4),
+                          heights = c(13+11.05*(floor((strwidth(table_export[4,2], unit = "in") * 11.2838)/120))))
+            addStyle(wb,sheet="Trend",topalign,rows=4,cols=1,stack=T)
+          }  
+          if((strwidth(table_export[7,2], unit = "in") * 11.2838)>120){
+            setRowHeights(wb,sheet="Trend",rows = c(7),
+                          heights = c(13+11.05*(floor((strwidth(table_export[7,2], unit = "in") * 11.2838)/120))))
+            addStyle(wb,sheet="Trend",topalign,rows=7,cols=1,stack=T)
+          }
+          
+          setRowHeights(wb,sheet="Trend",rows = c(2,8),heights = 30)
+          
+          
+          ##############################################
+          begin<-9
+          export_abbildungen<-data.frame(V1=NA)
+          add_height<-0
+          for(ab in (1:length(temp_ab_namen_final))){
+            export_abbildungen[add_height+1,1]<-temp_ab_namen_final[ab]
+            add_height<-add_height+(40/7.8)*(7.8/1000*400)
+          }
+          
+          writeData(wb,sheet="Trend",export_abbildungen,colNames = F,rowNames = F,startRow = begin)
+          addStyle(wb,sheet="Trend",cols=c(1),rows=begin:(length(export_abbildungen[,1])+begin),style=bold,stack=T)
+          addStyle(wb,sheet="Trend",cols=c(1),rows=begin:(length(export_abbildungen[,1])+begin),style=size_big,stack=T)
+
+
+
+          add_height<-0
+          for(ab in 1:length(temp_ab_namen_final)){
+            progress$inc(1/(length(temp_ab_namen_final)),detail=paste0(ab,"/",length(temp_ab_namen_final)))
+            
+            help_bar<-table_anti_bak_all[[which(temp_ab_namen_final[ab]==temp_ab_namen_final)]]
+            
+            png(paste0(tempdir(), "/", "plot",ab,".png"), width=1000, height=400,units = "px")
+            par(mar=c(5,5,2,1))
+            plot(NULL,xlab="",ylab="",xaxt="n",yaxt="n",main="",bty="n",
+                 xlim=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),ylim=c(0,100),cex.lab=2,xaxs="i")
+            axis(1,at=seq(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),
+                 labels=c(NA,seq(min(as.numeric(all_years)),max(as.numeric(all_years))),NA),cex.axis=1.5,tick = F)
+            axis(2,at=seq(0,100,20),las=2,cex.axis=1.5)
+            for(n in seq(0,100,10)){
+              points(x=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),y=c(n,n),col="grey90",lwd=1,type="l",lty=5)
+            }
+            points(x=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),y=c(0,0),col="grey90",lwd=3,type="l",lty=1)
+            points(x=c(min(as.numeric(all_years))-1,max(as.numeric(all_years))+1),y=c(100,100),col="grey90",lwd=3,type="l",lty=1)
+            for(m in 1:length(help_bar[,1])){
+              start<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][1])
+              end<-as.numeric(strsplit(help_bar[m,6],split = " - ")[[1]][2])
+              points(x=c(as.numeric(help_bar$Year[m]),as.numeric(help_bar$Year[m])),y=c(start,end),type="l",lwd=2)
+              points(x=c(as.numeric(help_bar$Year[m])-0.02,as.numeric(help_bar$Year[m])+0.02),y=c(start,start),type="l",lwd=3)
+              points(x=c(as.numeric(help_bar$Year[m])-0.02,as.numeric(help_bar$Year[m])+0.02),y=c(end,end),type="l",lwd=3)
+            }
+            points(x=help_bar$Year,y=help_bar$`R %`,cex=3,type="l",lwd=5)
+            points(x=help_bar$Year,y=help_bar$`R %`,cex=2,pch=21,type="p",lwd=3,bg="darkgoldenrod2",col="darkgoldenrod4")
+            
+            title("R %    95% KI R",line = 0.3,cex=1.5)
+            dev.off()
+
+            insertImage(wb, sheet="Trend", paste0(tempdir(), "/", "plot",ab,".png"), width = 8,height = 7.8/1000*400,
+                        startRow = begin+1+add_height,startCol = 1)
+            
+            add_height<-add_height+(40/7.8)*(7.8/1000*400)
+          }
+          
+          saveWorkbook(wb,file = file,overwrite=T)
+          
+          progress$close()
+          shinyjs::html("text", paste0("<br><br>","xlsx-Export erfolgreich generiert.","<br>"), add = TRUE) 
+        }
+      } 
+      
+    )
+    
+    
+    
+
+    
+    observeEvent(input$do_analyse,{
+      updateTabsetPanel(session,"main",
+                        selected="Cluster-Analyse")
+      shinyjs::html("text", paste0("<br>Cluster-Analyse wird gestartet.<br><br>"), add = FALSE)
+      if(input$analysis_type1=="pro Spezies"){
+        if(input$bak_select=="Nein" && is.null(input$bak_selected)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens einen Spezies aus.","<br>"), add = TRUE)    
+          return()
+        }
+        if(is.null(input$cluster_type_bak_heat1) && is.null(input$cluster_type_bak_umap1)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Cluster-Analyse aus.","<br>"), add = TRUE)  
+          return()
+        }
+      }
+      if(input$analysis_type1=="pro Klinik/Fachbereich"){
+        if(input$clinic_select=="Nein" && is.null(input$clinic_selected)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Klinik/Fachbereich aus.","<br>"), add = TRUE)    
+          return()
+        }
+        if(is.null(input$cluster_type_klinik_heat1)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Cluster-Analyse aus.","<br>"), add = TRUE)  
+          return()
+        }
+      }
+      
+      #########################
+      ###Eigentliche Analyse###
+      #########################
+      
+      #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+      #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+      
+      if(!is.null(input$analysis_type1c)&&input$analysis_type1c==T){
+        input2<-input2[input2$X_STATUS>0,]
+      }
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      
+      #helper1cluster<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1cluster<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1cluster<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1cluster<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1cluster<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1cluster<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1cluster<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      #if(input$analysis_type1b=="Alle"){
+      #  input3<-input2[format(helper1bakterien,"%Y")==input$analysis_type1a,]
+      #}else{
+      #  input3<-input2[format(helper1bakterien,"%Y")==input$analysis_type1a&input2$ORD_MATERIAL==input$analysis_type1b,]
+      #}
+        input3<-input2[format(helper1bakterien,"%Y")%in%input$analysis_type1a&input2$ORD_MATERIAL%in%input$analysis_type1b,]
+        
+      erstes_ab<-length(grep("_",names(input3)))+1
+
+      
+      ###########
+      ###Plots###
+      ###########
+      
+      ##Pro Spezies
+      
+      bakterien<-unique(input3$RES_ERREGER)
+      bakterien<-bakterien[order(bakterien)]
+      bakterien<-bakterien[as.vector(table(input3$RES_ERREGER))>=30]
+      
+      if(input$analysis_type1=='pro Spezies'){
+        if(input$bak_select=="Nein"){
+          bakterien<-input$bak_selected
+        }
+        
+        #farben<-distinctColorPalette(k=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+        farben<-c(c("#3E7C90","#F0D7E2","#E69EBB","#EC952E","#DFBDAB","#E3939A","#E7EFAF","#8CB8BA","#9EBC9F","#6A6BE5","#7081A8","#682DE7","#BDF43C","#C5A4F2","#EFE886",
+                    "#D74785","#6FD775","#71A134","#F146B9","#E43260","#B2729B","#99F390","#BEF2D0","#5C5E54","#B8B04A","#89EFE9","#E45F28","#C5BDF4","#7FEDA8","#AAC9F3",
+                    "#70C3B2","#C6B4C2","#67F548","#BBCB7B","#C5EDF0","#9C3F97","#BAF5B8","#46F1C1","#E2F2DC","#8BEDC3","#F2303A","#E7BB92","#A2B2C8","#9C7ABC","#EFBFDC",
+                    "#B3E669","#4D8BDA","#9DECF2","#E64FE0","#40ACB1","#C0EA8E","#EEED39","#5BF4E3","#4DA477","#EBD28D","#EB81B2","#F0C5F3","#87A3E2","#C4C5B1","#D185DE",
+                    "#E47075","#D5E257","#F09CEA","#A09A76","#D532EA","#CFDCEF","#B28AF3","#92D3EA","#AEB8B5","#E5A1D7","#B062E7","#DD77E8","#89545A","#49EC93","#5AD49D",
+                    "#E5BE44","#D77951","#E7E8E5","#C19A97","#DFDEB5","#EDB9BA","#E86ABE","#89CC80","#5AB1DD","#5D57A6","#772FAE","#54E35B","#9D8232","#E2A762","#CEB1D0",
+                    "#B5E5D9","#8FDC44","#DED5F5","#9E96EE","#E39A7B","#46CFBB","#F3DDC9","#B89BC5","#B5D59E","#4FD6E9",
+                    "#B2AE9D","#DFCCF6","#F1B85D","#C9B083","#CFBBC6","#E59692","#EECB4E","#AD7DF2","#DAE0BB","#DAD686","#E8A72F","#DA68C2","#5DBAA9","#605FDD","#7288A8","#F6EC7F",
+                    "#7867AF","#F4E6C5","#E8ACD2","#9BA5F3","#F2D210","#4FF337","#EA98B4","#7CBC35","#E31F84","#A6B467","#CCD770","#B49730","#5D4CE8","#EF1F52","#DF98E5","#B2B6E8",
+                    "#E5C1B9","#AFED7C","#A2F0E1","#36F5ED","#AA7A52","#269173","#8A8953","#96CBE4","#B1D1F8","#F2BDF0","#8FB3DB","#E760E9","#C880CA","#BC8ECD","#6A26E7","#3C89A3",
+                    "#859F9E","#87B963","#3EC7F3","#F2DEF2","#F0EFF2","#ACF2AE","#9C4953","#E76763","#FA9AEA","#84D4A3","#69DEEA","#803A85","#D9F78C","#CD91B3","#FAA8D3","#D5AAE7",
+                    "#80F9F3","#F2C0A2","#48D6C7","#A37380","#3E7E6E","#2EE8C8","#D8F06F","#92F6AB","#CBF7A4","#A2B84F","#3059AC","#CDC26C","#A46EA9","#7392F2","#7530AE","#7AC7EF",
+                    "#746754","#C362EE","#E44C1C","#5EEE9F","#98D6B8","#426B73","#A6C7C7","#ED85F1","#E552A0","#ADD57B","#C8A2A4","#C4ED40","#CFD023","#BA9DB3","#CCDBC4","#B2F6F2",
+                    "#52C2C9","#D1E9BF","#55F476","#8F615B","#AFF62B","#54A8F8","#A2CF9E","#4B95CC","#EBCD6D","#F09367","#EC872D","#EEF29B","#A82AE8","#C5EDE8","#8789CE","#E298D2",
+                    "#396896","#39EAF1","#F6F5BF","#E434EB","#A26BEB","#C377D8","#8BA682","#F1D5A9","#AEDBC6","#CC9BF2","#F8FAB0","#BB2C30","#37F26A","#DCE8A2","#A7A283","#8AD9DE",
+                    "#8279EB","#66C52E","#43EA7B","#DBF1ED","#C3E1A2","#CD49C0","#E7C2E1","#41B858","#D47C70","#99789D","#F32FCE","#CBEFD5","#DCF9BB","#F6E7AF","#B0BBC0","#EC7CAC",
+                    "#B26392","#5AD5EE","#C3ACF1","#ECAFB5","#A289E6","#F17AC7","#3DB9B5","#9350E7","#557DEF","#D84B77","#EDA687","#70D9D0","#F1B0F3","#C3BFDE","#D4D1CC","#89FA58",
+                    "#F1B877","#A932C2","#8DD8C8","#E396F5","#AABFA0","#C96B3F","#C9A180","#75BCF6","#62DA20","#A63FA1","#7BB3A4","#8AF4CD","#DAE2F4","#EFE2D3","#89B0F4","#DFCBAD",
+                    "#BEC390","#3CEEBB","#A2ED65","#A464BB","#FBDC92","#5DF1DF","#3EB6CC","#93F593","#6EC27B","#F3D2D4","#E47B8B","#7E60C0","#81F685","#9998A6","#A5DDF0","#ED46B8",
+                    "#65AE85","#C2EAF5","#C2EEBB","#2EB07B","#689C4A","#3F86DE","#B2F1CD","#F0B8CB","#81D5EE","#76B5C6","#7BF0B8","#EEF8DD","#D8D150","#D5B675","#E49F51","#F1F060",
+                    "#E9F334","#C46FE5","#87EED9"))[1:length(levels(as.factor(input3$ORD_FACHBEREICH)))]
+        names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+        
+        ##Clustering: Heatmap, Supervised, 1) Klinik/Fachbereich, 2) Resistenz
+        if(length(grep("Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz",input$cluster_type_bak_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz'","<br>"), add = TRUE)  
+          
+          #farben<-distinctColorPalette(k=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+
+          output$plots1 <- renderUI({
+            plot_output_list <- lapply(1:length(bakterien), function(k) {
+              plotname <- paste("plot", k, sep="")
+              plotOutput(plotname, height = 400, width = 1250)
+            })
+            do.call(tagList, plot_output_list)
+          })
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz", value = 0)
+          for(i in 1:length(bakterien)){
+            local({
+
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              
+              temp3_2<-as.data.frame(temp3[,missing>0.03])
+              
+              helper<-c()
+              for(j in 1:length(temp2$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              fachbereiche<-as.numeric(table(temp2$ORD_FACHBEREICH))
+              fachbereiche2<-c()
+              for(j in 1:length(fachbereiche)){
+                fachbereiche2[j]<-sum(fachbereiche[1:j])
+              }
+              
+              output$text_analyse1<-renderText({NULL})
+              
+              
+              my_i <- i
+              plotname <- paste("plot", my_i, sep="")
+
+              output[[plotname]] <- renderPlot({
+                einmalig<-unique(as.vector(as.matrix(temp3_2)))
+                einmalig<-einmalig[!is.na(einmalig)]
+                einmalig<-einmalig*2-1
+                
+                pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                         main=bakterien[my_i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                         cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                         clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))), fontsize_col = 5,gaps_col = fachbereiche2)
+                
+              })
+              progress$inc(1/length(bakterien))
+            })
+          }
+          
+          progress$close()
+        }
+        
+        ##Clustering: Heatmap, Supervised, 1) Klinik/Fachbereich, 2) Datum
+        if(length(grep("Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum",input$cluster_type_bak_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum'","<br>"), add = TRUE)  
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          output$plots2 <- renderUI({
+            plot_output_list2 <- lapply(1:length(bakterien), function(k) {
+              plotname2 <- paste("plot2_", k, sep="")
+              plotOutput(plotname2, height = 400, width = 1250)
+            })
+            do.call(tagList, plot_output_list2)
+          })
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum", value = 0)
+          for(i in 1:length(bakterien)){
+            local({
+              
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              temp2$ORD_DATUM<-as.Date(temp2$ORD_DATUM,format = "%d.%m.%Y")
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH,temp2$ORD_DATUM),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              
+              temp3_2<-as.data.frame(temp3[,missing>0.03])
+              
+              helper<-c()
+              for(j in 1:length(temp2$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                #Fachbereich = rainbow(n=length(levels(as.factor(temp2$ORD_FACHBEREICH)))),
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              fachbereiche<-as.numeric(table(temp2$ORD_FACHBEREICH))
+              fachbereiche2<-c()
+              for(j in 1:length(fachbereiche)){
+                fachbereiche2[j]<-sum(fachbereiche[1:j])
+              }
+              
+              output$text_analyse2<-renderText({NULL})
+              
+              my_i <- i
+              plotname2 <- paste("plot2_", my_i, sep="")
+              
+              output[[plotname2]] <- renderPlot({
+                einmalig<-unique(as.vector(as.matrix(temp3_2)))
+                einmalig<-einmalig[!is.na(einmalig)]
+                einmalig<-einmalig*2-1
+                
+                pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                         main=bakterien[my_i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                         cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                         clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))),
+                         fontsize_col = 5,gaps_col = fachbereiche2)
+                
+              })
+              progress$inc(1/length(bakterien))
+            })
+          }
+          
+          progress$close()
+        }
+        
+        ##Clustering: Heatmap, Unsupervised
+        if(length(grep("Hierarchisches Clustering",input$cluster_type_bak_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Hierarchisches Clustering'","<br>"), add = TRUE)  
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          output$plots3 <- renderUI({
+            plot_output_list3 <- lapply(1:length(bakterien), function(k) {
+              plotname3 <- paste("plot3_", k, sep="")
+              plotOutput(plotname3, height = 400, width = 1250)
+            })
+            do.call(tagList, plot_output_list3)
+          })
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Hierarchisches Clustering", value = 0)
+          for(i in 1:length(bakterien)){
+            local({
+              
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(as.data.frame(temp3[,missing>0.3]))
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_2b<-as.data.frame(temp3_2[missing>0.3,])
+              temp3_2<-temp3_2b
+              
+              
+              helper<-c()
+              for(j in 1:length(temp2$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                #Fachbereich = rainbow(n=length(levels(as.factor(temp2$ORD_FACHBEREICH)))),
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              backup_rownames<-rownames(my_annot)[rownames(my_annot)%in%rownames(temp3_2)]
+              my_annot<-as.data.frame(my_annot[rownames(my_annot)%in%rownames(temp3_2),])
+              rownames(my_annot)<-backup_rownames
+              names(my_annot)<-"Fachbereich"
+              ann_colors$Fachbereich<-ann_colors$Fachbereich[names(ann_colors$Fachbereich)%in%unique(my_annot[,1])]
+              
+              
+
+              output$text_analyse3<-renderText({NULL})
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2missing<-as.data.frame(temp3[,missing>0.8])
+              
+              missing<-rowSums(!is.na(temp3_2missing))/length(temp3_2missing[1,])
+              temp3_3missing<-as.data.frame(temp3_2missing[missing==1,])
+              row.names(temp3_3missing)<-NULL
+              
+              #abc=data.frame(x=1)
+              #data<-lapply(abc,function(x){
+              #  tryCatch({
+              #    clusters<-NbClust(temp3_3missing,
+              #                      min.nc = 2, max.nc = 5, method = "ward.D",index = "duda")
+              #  },error=function(e) NULL)
+              #})
+              #if(!is.null(data[[1]])){
+                
+              if(length(temp3_3missing[,1])<100){
+                beste = tryCatch({
+                  clusters<-NbClust(temp3_3missing,
+                                    min.nc = 1, max.nc = 5, method = "ward.D",index = "duda")
+                  clusters$Best.nc[1]
+                }, error = function(e) {
+                  1
+                })
+              }else{
+                beste = tryCatch({
+                  clusters<-NbClust(temp3_3missing,
+                                    min.nc = 1, max.nc = 10, method = "ward.D",index = "duda")
+                  clusters$Best.nc[1]
+                }, error = function(e) {
+                  1
+                })
+              }
+
+                  
+              #clusters<-NbClust(temp3_3missing,
+              #                  min.nc = 2, max.nc = 5, method = "ward.D",index = "duda")
+              #beste<-clusters$Best.nc[1]
+
+              my_i <- i
+              plotname3 <- paste("plot3_", my_i, sep="")
+              
+              output[[plotname3]] <- renderPlot({
+                einmalig<-unique(as.vector(as.matrix(temp3_2)))
+                einmalig<-einmalig[!is.na(einmalig)]
+                einmalig<-einmalig*2-1
+                
+                abc=data.frame(x=1)
+                data<-lapply(abc,function(x){
+                  tryCatch({
+                    pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                                                     main=bakterien[my_i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                                                     cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                                                     clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))),
+                                                     fontsize_col = 5,cutree_cols = beste)
+                    
+                  },error=function(e) NULL)
+                })
+                if(!is.null(data[[1]])&&beste!=1){
+                  pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=bakterien[my_i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))),
+                           fontsize_col = 5,cutree_cols = beste)
+                }else{
+                  plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                       yaxt="n",bty="n",main=paste0(bakterien[my_i]," - kein Clustering möglich"))
+                }
+              })
+              #}else{
+              #  my_i <- i
+              #  plotname3 <- paste("plot3", my_i, sep="")
+              #  
+              #  output[[plotname3]] <- renderPlot({
+              #    plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+              #         main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+               # })
+              #}
+            })
+            progress$inc(1/length(bakterien))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: UMAP mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Plot mit eingefärbten Kliniken/Fachbereichen",input$cluster_type_bak_umap1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle UMAP 'Plot mit eingefärbten Kliniken/Fachbereichen'","<br>"), add = TRUE)  
+
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          output$plots4 <- renderUI({
+            plot_output_list4 <- lapply(1:length(bakterien), function(k) {
+              plotname4 <- paste("plot4_", k, sep="")
+              plotOutput(plotname4, height = 400, width = 1250)
+            })
+            do.call(tagList, plot_output_list4)
+          })
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle UMAP 'Plot mit eingefärbten Kliniken/Fachbereichen", value = 0)
+          for(i in 1:length(bakterien)){
+            local({
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              shinyjs::html("text", paste0(" (",length(temp[,1]),"x",length(temp[1,]),"=",length(temp[,1])*length(temp[1,])," Elemente)"), add = TRUE)
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+              colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+              rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+
+              helper<-c()
+              for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2_3$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+              output$text_analyse4<-renderText({NULL})              
+              output$text_analyse4b<-renderText({"Hinweis: Sollten alle Spezies gleichzeitig analysiert werden, kann es beim 1. Aufruf bis zu 2 Minuten dauern, bis die aktualisierten Plots angezeigt werden."})
+              
+              
+              my_i <- i
+              plotname4 <- paste("plot4_", my_i, sep="")
+              
+              output[[plotname4]] <- renderPlot({
+                abc=data.frame(x=1)
+                data<-lapply(abc,function(x){
+                  tryCatch(M3C::umap(t(as.matrix(temp3_3)),labels=names(helper),colvec = helper,seed = 42) + ggtitle(bakterien[my_i]) + 
+                             theme(plot.title = element_text(size = 20,hjust = 0.5)),error=function(e) NULL)
+                })
+                if(!is.null(data[[1]])){
+                  M3C::umap(t(as.matrix(temp3_3)),legendtextsize = min(7,floor(210/length(unique(names(helper))))), 
+                            labels=names(helper),colvec = helper,seed = 42,controlscale = T,scale=3,dotsize=2) + ggtitle(bakterien[my_i]) + 
+                    theme(plot.title = element_text(size = 20,hjust = 0.5,face="bold"))+xlab("UMAP 1")+ylab("UMAP 2")
+                }else{
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                }
+                
+              })
+              }else{
+                my_i <- i
+                plotname4 <- paste("plot4_", my_i, sep="")
+                
+                output[[plotname4]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+            })
+            progress$inc(1/length(bakterien))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Clustering: UMAP mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Plot mit eingefärbten Clustern",input$cluster_type_bak_umap1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle UMAP 'Plot mit eingefärbten Clustern'","<br>"), add = TRUE)  
+
+          #dimensionen<-data.frame(spezies=bakterien,x=NA,y=NA,zusammen=NA)
+          #for(i in 1:length(bakterien)){
+          #  temp<-input3[input3$RES_ERREGER==bakterien[i],]
+          #  dimensionen$x[i]<-length(temp[1,])
+          #  dimensionen$y[i]<-length(temp[,1])
+          #  dimensionen$zusammen[i]<-length(temp[1,])*length(temp[,1])
+          #}
+          #if(sum(dimensionen$zusammen>100000)>1){
+          #  shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbspBitte wählen Sie für eine komplexe Clusteranalyse mit UMAPs ein Subset an Spezies aus",
+          #                               "<br>","&nbsp&nbsp&nbsp(maximal 1 Spezies mit >100000 Elementen)<br>"), add = TRUE) 
+          #  for(i in which(dimensionen$zusammen>100000)){
+          #    shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp",dimensionen$spezies[i],": ",dimensionen$zusammen[i],"Elemente"), add = TRUE) 
+          #  }
+          #  return()
+          #}
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp Vorverarbeitung:"), add = TRUE)  
+          
+          weite<-c()
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle UMAP 'Plot mit eingefärbten Clustern - Vorverarbeitung", value = 0)
+          moeglich_speicher<-c()
+          partition_speicher<-list()
+          
+          for(i in 1:length(bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]),add = TRUE) 
+
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              shinyjs::html("text", paste0(" (",length(temp[,1]),"x",length(temp[1,]),"=",length(temp[,1])*length(temp[1,])," Elemente)"), add = TRUE)
+
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+              colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+              rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+              
+              helper<-c()
+              for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2_3$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+              
+              abc=data.frame(x=1)
+              data<-lapply(abc,function(x){
+                tryCatch({
+                  pdf(file = NULL)
+                  alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                  test<-data.frame(alt$data)
+                  
+                  #clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+                  #clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+                  #clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="pseudot2")
+                  #clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans")
+                  clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+                  clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="kl")
+                  clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="ch")
+                  clusters4<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="scott")
+                  clusters5<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+                  clusters6<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="dunn")
+                  
+                  dev.off()
+                },error=function(e) NULL)
+              })
+              if(!is.null(data[[1]])){
+                alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                test<-data.frame(alt$data)
+                pdf(file = NULL)
+                clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+                clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="kl")
+                clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="ch")
+                clusters4<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="scott")
+                clusters5<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+                clusters6<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="dunn")
+                dev.off()
+                #beste<-table(c(clusters1$Best.nc[1],clusters2$Best.nc[1],clusters3$Best.nc[1]))
+                #beste<-table(clusters$Best.nc[1,])
+                #moeglich<-as.numeric(names(beste)[which.max(beste)&beste>=10])
+                #temp<-beste[max(beste)==beste]
+                #moeglich<-as.numeric(min(names(temp)[temp>=3]))
+                #moeglich<-as.numeric(min(names(temp)))
+                
+                beste<-table(c(clusters1$Best.nc[1],clusters4$Best.nc[1],clusters3$Best.nc[1],clusters5$Best.nc[1],clusters6$Best.nc[1]))
+                if(beste[max(beste)==beste][1]>=2&&
+                   sd(clusters1$All.index)>=5&&sd(clusters2$All.index)>=0.05){
+                  moeglich<-as.numeric(min(names(beste[max(beste)==beste][1])))
+                  if(moeglich==clusters1$Best.nc[1]){
+                    best_cluster<-clusters1
+                  }else{
+                    if(moeglich==clusters3$Best.nc[1]){
+                      best_cluster<-clusters3
+                    }else{
+                      if(moeglich==clusters4$Best.nc[1]){
+                        best_cluster<-clusters4
+                      }else{
+                        if(moeglich==clusters5$Best.nc[1]){
+                          best_cluster<-clusters5
+                        }
+                      }
+                    }
+                    
+                  }
+                }else{
+                  moeglich<-0
+                }
+
+                if(moeglich>0){
+                  weite<-c(weite,650)                
+                  moeglich_speicher[i]<-moeglich
+                  partition_speicher[[i]]<-best_cluster$Best.partition
+                }else{
+                  weite<-c(weite,1250)                
+                  moeglich_speicher[i]<-0
+                  partition_speicher[[i]]<-NA
+                }
+              }else{
+                dev.off()
+                weite<-c(weite,1250)                
+                moeglich_speicher[i]<-NA
+                partition_speicher[[i]]<-NA
+              }
+              }else{
+                weite<-c(weite,1250)                
+                moeglich_speicher[i]<-NA
+                partition_speicher[[i]]<-NA
+              }
+              progress$inc(1/length(bakterien))
+          }
+          progress$close()
+
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp Erzeuge Plots:"), add = TRUE)  
+          
+          output$plots5 <- renderUI({
+            plot_output_list5 <- lapply(1:length(bakterien), function(k) {
+              plotname5 <- paste("plot5_", k, sep="")
+              plotOutput(plotname5, height = 400, width = weite[k])
+            })
+            do.call(tagList, plot_output_list5)
+          })
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle UMAP 'Plot mit eingefärbten Clustern - Plots erzeugen", value = 0)
+
+          for(i in 1:length(bakterien)){
+            local({
+              #start.time <- Sys.time()
+              #message(bakterien[i]," Dimensionen: ",length(temp[,1]),"x",length(temp[1,])," ist ",length(temp[,1])*length(temp[1,]))
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              shinyjs::html("text", paste0(" (",length(temp[,1]),"x",length(temp[1,]),"=",length(temp[,1])*length(temp[1,])," Elemente)"), add = TRUE) 
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+              colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+              rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+              
+              helper<-c()
+              for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2_3$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+              #abc=data.frame(x=1)
+              #data<-lapply(abc,function(x){
+              #  tryCatch({
+              #    pdf(file = NULL)
+              #    alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+              #    test<-data.frame(alt$data)
+              #    clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",
+              #                      min.nc = 2, max.nc = 5, method = "kmeans")
+              #    dev.off()
+              #  },error=function(e) NULL)
+              #})
+              #if(!is.null(data[[1]])){
+              if(!is.na(moeglich_speicher[i])){
+                alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                test<-data.frame(alt$data)
+                #pdf(file = NULL)
+                #clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",
+                #                  min.nc = 2, max.nc = 5, method = "kmeans")
+                #dev.off()
+                #beste<-table(clusters$Best.nc[1,])
+                ####moeglich<-as.numeric(names(beste)[which.max(beste)&beste>=5])
+                #temp<-beste[max(beste)==beste]
+                #moeglich<-as.numeric(min(names(temp)[temp>=5]))
+                moeglich<-moeglich_speicher[i]
+                partition<-partition_speicher[[i]]
+                
+                output$text_analyse5<-renderText({NULL})
+                output$text_analyse5b<-renderText({"Hinweis: Sollten alle Spezies gleichzeitig analysiert werden, kann es beim 1. Aufruf bis zu 2 Minuten dauern, bis die aktualisierten Plots angezeigt werden."})
+                
+                my_i <- i
+                plotname5 <- paste("plot5_", my_i, sep="")
+
+                output[[plotname5]] <- renderPlot({
+                  if(moeglich>0){
+                    #if(moegliche[my_i]>0){
+                    #k_clust<-kmeans(test,centers =moeglich[1])
+                    
+                    M3C::umap(t(as.matrix(temp3_3)),labels=as.factor(partition),
+                              legendtextsize = min(7,floor(210/length(unique(names(helper))))), 
+                              seed=42,colvec = col_vec[1:length(levels(as.factor(partition)))],
+                              controlscale = T,scale=3) + 
+                      ggtitle(bakterien[my_i]) + 
+                      theme(plot.title = element_text(size = 20,hjust = 0.5,face="bold"))+xlab("UMAP 1")+ylab("UMAP 2")
+                    
+                  }else{
+                    M3C::umap(t(as.matrix(temp3_3)),labels=names(helper),colvec = helper,seed = 42,dotsize=2,
+                              legendtextsize = min(7,floor(210/length(unique(names(helper)))))) + 
+                      ggtitle(paste0(bakterien[my_i]," - kein eindeutiges Clustering möglich")) + 
+                      theme(plot.title = element_text(size = 20,hjust = 0.5,face="bold"))+xlab("UMAP 1")+ylab("UMAP 2")
+                  }
+                })
+              }else{
+                #dev.off()
+                output$text_analyse5<-renderText({NULL})
+                output$text_analyse5b<-renderText({"Hinweis: Sollten alle Spezies gleichzeitig analysiert werden, kann es beim 1. Aufruf bis zu 2 Minuten dauern, bis die aktualisierten Plots angezeigt werden."})
+                
+                my_i <- i
+                plotname5 <- paste("plot5_", my_i, sep="")
+                
+                output[[plotname5]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+              }else{
+                output$text_analyse5<-renderText({NULL})
+                output$text_analyse5b<-renderText({"Hinweis: Beim 1. Aufruf kann es bis zu 60 Sekunden dauern, bis die Plots angezeigt werden."})
+                
+                my_i <- i
+                plotname5 <- paste("plot5_", my_i, sep="")
+                
+                output[[plotname5]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+              
+            })
+            #end.time <- Sys.time()
+            #message("Zeit final: ",end.time-start.time)
+            progress$inc(1/length(bakterien))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Zusätzliche Heatmap supervised nach UMAP-Clustern mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Daten sortieren nach UMAP-Clustern",input$cluster_type_bak_umap2,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle zusätzliche Heatmap 'Daten sortieren nach UMAP-Clustern'","<br>"), add = TRUE)  
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+
+          output$plots6 <- renderUI({
+            plot_output_list6 <- lapply(1:length(bakterien), function(k) {
+              plotname6 <- paste("plot6_", k, sep="")
+              plotOutput(plotname6, height = 410, width = 1250)
+            })
+            do.call(tagList, plot_output_list6)
+          })
+          
+
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle zusätzliche Heatmap 'Daten sortieren nach UMAP-Clustern", value = 0)
+          for(i in 1:length(bakterien)){
+            local({
+              
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+              colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+              rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+              
+              helper<-c()
+              for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2_3$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+              #abc=data.frame(x=1)
+              #data<-lapply(abc,function(x){
+              #  tryCatch({
+              #    pdf(file = NULL)
+              #    alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+              #    test<-data.frame(alt$data)
+              #    
+              #    clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+              #    clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+              #    clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="pseudot2")
+              #    #clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans")
+              #    
+              #    dev.off()
+              #  },error=function(e) NULL)
+              #})
+              #if(!is.null(data[[1]])){
+              if(!is.na(moeglich_speicher[i])){
+                alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                test<-data.frame(alt$data)
+              #  pdf(file = NULL)
+              #  #clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans")
+              #  clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+              #  clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+              #  clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="pseudot2")
+              #  
+              #  dev.off()
+              #  beste<-table(c(clusters1$Best.nc[1],clusters2$Best.nc[1],clusters3$Best.nc[1]))
+              #  #beste<-table(clusters$Best.nc[1,])
+              #  #moeglich<-as.numeric(names(beste)[which.max(beste)&beste>=10])
+              #  temp<-beste[max(beste)==beste]
+              #  #moeglich<-as.numeric(min(names(temp)[temp>=3]))
+              #  moeglich<-as.numeric(min(names(temp)))
+                
+
+                  moeglich<-moeglich_speicher[i]
+                  partition<-partition_speicher[[i]]
+                output$text_analyse6<-renderText({NULL})
+                
+                my_i <- i
+                plotname6 <- paste("plot6_", my_i, sep="")
+                
+                output[[plotname6]] <- renderPlot({
+                  if(moeglich>0){
+                    #k_clust<-kmeans(test,centers =moeglich[1])
+                    
+                    soll_order<-partition[order(partition)]
+                    
+                    temp3_3_ordered<-temp3_3[match(names(soll_order),row.names(temp3_3)),]
+                    my_annot_ordered<-as.data.frame(my_annot[match(names(soll_order),row.names(temp3_3)),])
+                    colnames(my_annot_ordered)<-c("Fachbereich")
+                    
+                    fachbereiche<-as.numeric(table(soll_order))
+                    fachbereiche2<-c()
+                    for(m in 1:length(fachbereiche)){
+                      fachbereiche2[m]<-sum(fachbereiche[1:m])
+                    }
+                    
+                    my_annot_ordered<-cbind(my_annot_ordered,Cluster=as.character(soll_order))
+                    rownames(my_annot_ordered)<-rownames(temp3_3_ordered)
+                    #colnames(my_annot_ordered)<-c("Fachbereich","Cluster")
+                    
+                    ann_colors = list(
+                      Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))],
+                      Cluster = col_vec[1:length(levels(as.factor(my_annot_ordered$Cluster)))]
+                    )
+                    names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                    names(ann_colors$Cluster)<-levels(as.factor(my_annot_ordered$Cluster))
+                    
+                    einmalig<-unique(as.vector(as.matrix(temp3_3_ordered)))
+                    einmalig<-einmalig[!is.na(einmalig)]
+                    einmalig<-einmalig*2-1
+                    
+                    pheatmap(t(as.matrix(temp3_3_ordered)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                             main=bakterien[my_i],annotation_col =my_annot_ordered,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                             cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                             clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))),
+                             fontsize_col = 5,gaps_col = fachbereiche2)
+
+                  }else{
+                    fachbereiche<-as.numeric(table(temp2_3$ORD_FACHBEREICH))
+                    fachbereiche2<-c()
+                    for(j in 1:length(fachbereiche)){
+                      fachbereiche2[j]<-sum(fachbereiche[1:j])
+                    }
+                    
+                    einmalig<-unique(as.vector(as.matrix(temp3_3)))
+                    einmalig<-einmalig[!is.na(einmalig)]
+                    einmalig<-einmalig*2-1
+                    
+                    pheatmap(t(as.matrix(temp3_3)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                             main=paste0(bakterien[my_i]," - kein eindeutiges Clustering möglich"),annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                             cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                             clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))), 
+                             fontsize_col = 5,gaps_col = fachbereiche2)
+                  }
+                })
+              }else{
+                #dev.off()
+                output$text_analyse6<-renderText({NULL})
+                
+                my_i <- i
+                plotname6 <- paste("plot6_", my_i, sep="")
+                
+                output[[plotname6]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+              }else{
+                output$text_analyse6<-renderText({NULL})
+                
+                my_i <- i
+                plotname6 <- paste("plot6_", my_i, sep="")
+                
+                output[[plotname6]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+              
+              
+            })
+            progress$inc(1/length(bakterien))
+          }
+        progress$close()
+        }
+
+        ##Clustering: Zusätzliche Heatmap supervised nach Kliniken/Fachbereichen mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Daten sortieren nach Kliniken/Fachbereichen",input$cluster_type_bak_umap2,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle zusätzliche Heatmap 'Daten sortieren nach Kliniken/Fachbereichen'","<br>"), add = TRUE)  
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          output$plots6b <- renderUI({
+            plot_output_list6b <- lapply(1:length(bakterien), function(k) {
+              plotname6b <- paste("plot6b", k, sep="")
+              plotOutput(plotname6b, height = 410, width = 1250)
+            })
+            do.call(tagList, plot_output_list6b)
+          })
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle zusätzliche Heatmap 'Daten sortieren nach Kliniken/Fachbereichen", value = 0)
+          for(i in 1:length(bakterien)){
+            local({
+              
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+              colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+              rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+              
+              helper<-c()
+              for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2_3$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+              #abc=data.frame(x=1)
+              #data<-lapply(abc,function(x){
+              #  tryCatch({
+              #    pdf(file = NULL)
+              #    alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+              #    test<-data.frame(alt$data)
+              #    
+              #    clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+              #    clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+              #    clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="pseudot2")
+              #    #clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans")
+              #    
+              #    dev.off()
+              #  },error=function(e) NULL)
+              #})
+              #if(!is.null(data[[1]])){
+              if(!is.na(moeglich_speicher[i])){
+                alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                test<-data.frame(alt$data)
+              #  pdf(file = NULL)
+              #  #clusters<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans")
+              #  clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+              #  clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+              #  clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="pseudot2")
+              #  
+              #  dev.off()
+              #  beste<-table(c(clusters1$Best.nc[1],clusters2$Best.nc[1],clusters3$Best.nc[1]))
+              #  #beste<-table(clusters$Best.nc[1,])
+              #  #moeglich<-as.numeric(names(beste)[which.max(beste)&beste>=10])
+              #  temp<-beste[max(beste)==beste]
+              #  #moeglich<-as.numeric(min(names(temp)[temp>=3]))
+              #  moeglich<-as.numeric(min(names(temp)))
+                
+
+                 moeglich<-moeglich_speicher[i]
+                 partition<-partition_speicher[[i]]
+                output$text_analyse6b<-renderText({NULL})
+                
+                my_i <- i
+                plotname6b <- paste("plot6b", my_i, sep="")
+                
+                output[[plotname6b]] <- renderPlot({
+                  if(moeglich>0){
+                    #k_clust<-kmeans(test,centers =moeglich[1])
+                    
+                    soll_order<-partition[order(my_annot$Fachbereich,partition)]
+                    
+                    temp3_3_ordered<-temp3_3[match(names(soll_order),row.names(temp3_3)),]
+                    my_annot_ordered<-as.data.frame(my_annot[match(names(soll_order),row.names(temp3_3)),])
+                    colnames(my_annot_ordered)<-c("Fachbereich")
+                    
+                    fachbereiche<-as.numeric(table(my_annot_ordered$Fachbereich))
+                    fachbereiche2<-c()
+                    for(m in 1:length(fachbereiche)){
+                      fachbereiche2[m]<-sum(fachbereiche[1:m])
+                    }
+                    
+                    my_annot_ordered<-cbind(my_annot_ordered,Cluster=as.character(soll_order))
+                    rownames(my_annot_ordered)<-rownames(temp3_3_ordered)
+                    
+                    ann_colors = list(
+                      Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))],
+                      Cluster = col_vec[1:length(levels(as.factor(my_annot_ordered$Cluster)))]
+                    )
+                    names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                    names(ann_colors$Cluster)<-levels(as.factor(my_annot_ordered$Cluster))
+                    
+                    einmalig<-unique(as.vector(as.matrix(temp3_3_ordered)))
+                    einmalig<-einmalig[!is.na(einmalig)]
+                    einmalig<-einmalig*2-1
+
+                    pheatmap(t(as.matrix(temp3_3_ordered)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                             main=bakterien[my_i],annotation_col =my_annot_ordered,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                             cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                             clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))),
+                             fontsize_col = 5,gaps_col = fachbereiche2)
+                    
+                  }else{
+                    fachbereiche<-as.numeric(table(temp2_3$ORD_FACHBEREICH))
+                    fachbereiche2<-c()
+                    for(j in 1:length(fachbereiche)){
+                      fachbereiche2[j]<-sum(fachbereiche[1:j])
+                    }
+                    
+                    einmalig<-unique(as.vector(as.matrix(temp3_3)))
+                    einmalig<-einmalig[!is.na(einmalig)]
+                    einmalig<-einmalig*2-1
+
+                    pheatmap(t(as.matrix(temp3_3)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                             main=paste0(bakterien[my_i]," - kein eindeutiges Clustering möglich"),annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                             cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                             clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))),
+                             fontsize_col = 5,gaps_col = fachbereiche2)
+                  }
+                })
+              }else{
+                #dev.off()
+                
+                output$text_analyse6b<-renderText({NULL})
+                
+                my_i <- i
+                plotname6b <- paste("plot6b", my_i, sep="")
+                
+                output[[plotname6b]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+              }else{
+                output$text_analyse6b<-renderText({NULL})
+                
+                my_i <- i
+                plotname6b <- paste("plot6b", my_i, sep="")
+                
+                output[[plotname6b]] <- renderPlot({
+                  plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                       main=paste0(bakterien[my_i]," - Datenlage nicht ausreichend"),bty="n")
+                })
+              }
+            })
+            progress$inc(1/length(bakterien))
+          }
+          progress$close()
+        }
+      }
+      
+      ##Pro Spezies
+      fachbereich<-unique(input3$ORD_FACHBEREICH)
+      fachbereich<-fachbereich[order(fachbereich)]
+      fachbereich<-fachbereich[as.vector(table(input3$ORD_FACHBEREICH))>=30]
+      
+      
+      if(input$analysis_type1=='pro Klinik/Fachbereich'){
+        if(input$clinic_select=="Nein"){
+          fachbereich<-input$clinic_selected
+        }
+        
+        #farben<-distinctColorPalette(k=length(levels(as.factor(input3$RES_ERREGER))))
+        farben<-c(c("#3E7C90","#F0D7E2","#E69EBB","#EC952E","#DFBDAB","#E3939A","#E7EFAF","#8CB8BA","#9EBC9F","#6A6BE5","#7081A8","#682DE7","#BDF43C","#C5A4F2","#EFE886",
+                    "#D74785","#6FD775","#71A134","#F146B9","#E43260","#B2729B","#99F390","#BEF2D0","#5C5E54","#B8B04A","#89EFE9","#E45F28","#C5BDF4","#7FEDA8","#AAC9F3",
+                    "#70C3B2","#C6B4C2","#67F548","#BBCB7B","#C5EDF0","#9C3F97","#BAF5B8","#46F1C1","#E2F2DC","#8BEDC3","#F2303A","#E7BB92","#A2B2C8","#9C7ABC","#EFBFDC",
+                    "#B3E669","#4D8BDA","#9DECF2","#E64FE0","#40ACB1","#C0EA8E","#EEED39","#5BF4E3","#4DA477","#EBD28D","#EB81B2","#F0C5F3","#87A3E2","#C4C5B1","#D185DE",
+                    "#E47075","#D5E257","#F09CEA","#A09A76","#D532EA","#CFDCEF","#B28AF3","#92D3EA","#AEB8B5","#E5A1D7","#B062E7","#DD77E8","#89545A","#49EC93","#5AD49D",
+                    "#E5BE44","#D77951","#E7E8E5","#C19A97","#DFDEB5","#EDB9BA","#E86ABE","#89CC80","#5AB1DD","#5D57A6","#772FAE","#54E35B","#9D8232","#E2A762","#CEB1D0",
+                    "#B5E5D9","#8FDC44","#DED5F5","#9E96EE","#E39A7B","#46CFBB","#F3DDC9","#B89BC5","#B5D59E","#4FD6E9",
+                    "#B2AE9D","#DFCCF6","#F1B85D","#C9B083","#CFBBC6","#E59692","#EECB4E","#AD7DF2","#DAE0BB","#DAD686","#E8A72F","#DA68C2","#5DBAA9","#605FDD","#7288A8","#F6EC7F",
+                    "#7867AF","#F4E6C5","#E8ACD2","#9BA5F3","#F2D210","#4FF337","#EA98B4","#7CBC35","#E31F84","#A6B467","#CCD770","#B49730","#5D4CE8","#EF1F52","#DF98E5","#B2B6E8",
+                    "#E5C1B9","#AFED7C","#A2F0E1","#36F5ED","#AA7A52","#269173","#8A8953","#96CBE4","#B1D1F8","#F2BDF0","#8FB3DB","#E760E9","#C880CA","#BC8ECD","#6A26E7","#3C89A3",
+                    "#859F9E","#87B963","#3EC7F3","#F2DEF2","#F0EFF2","#ACF2AE","#9C4953","#E76763","#FA9AEA","#84D4A3","#69DEEA","#803A85","#D9F78C","#CD91B3","#FAA8D3","#D5AAE7",
+                    "#80F9F3","#F2C0A2","#48D6C7","#A37380","#3E7E6E","#2EE8C8","#D8F06F","#92F6AB","#CBF7A4","#A2B84F","#3059AC","#CDC26C","#A46EA9","#7392F2","#7530AE","#7AC7EF",
+                    "#746754","#C362EE","#E44C1C","#5EEE9F","#98D6B8","#426B73","#A6C7C7","#ED85F1","#E552A0","#ADD57B","#C8A2A4","#C4ED40","#CFD023","#BA9DB3","#CCDBC4","#B2F6F2",
+                    "#52C2C9","#D1E9BF","#55F476","#8F615B","#AFF62B","#54A8F8","#A2CF9E","#4B95CC","#EBCD6D","#F09367","#EC872D","#EEF29B","#A82AE8","#C5EDE8","#8789CE","#E298D2",
+                    "#396896","#39EAF1","#F6F5BF","#E434EB","#A26BEB","#C377D8","#8BA682","#F1D5A9","#AEDBC6","#CC9BF2","#F8FAB0","#BB2C30","#37F26A","#DCE8A2","#A7A283","#8AD9DE",
+                    "#8279EB","#66C52E","#43EA7B","#DBF1ED","#C3E1A2","#CD49C0","#E7C2E1","#41B858","#D47C70","#99789D","#F32FCE","#CBEFD5","#DCF9BB","#F6E7AF","#B0BBC0","#EC7CAC",
+                    "#B26392","#5AD5EE","#C3ACF1","#ECAFB5","#A289E6","#F17AC7","#3DB9B5","#9350E7","#557DEF","#D84B77","#EDA687","#70D9D0","#F1B0F3","#C3BFDE","#D4D1CC","#89FA58",
+                    "#F1B877","#A932C2","#8DD8C8","#E396F5","#AABFA0","#C96B3F","#C9A180","#75BCF6","#62DA20","#A63FA1","#7BB3A4","#8AF4CD","#DAE2F4","#EFE2D3","#89B0F4","#DFCBAD",
+                    "#BEC390","#3CEEBB","#A2ED65","#A464BB","#FBDC92","#5DF1DF","#3EB6CC","#93F593","#6EC27B","#F3D2D4","#E47B8B","#7E60C0","#81F685","#9998A6","#A5DDF0","#ED46B8",
+                    "#65AE85","#C2EAF5","#C2EEBB","#2EB07B","#689C4A","#3F86DE","#B2F1CD","#F0B8CB","#81D5EE","#76B5C6","#7BF0B8","#EEF8DD","#D8D150","#D5B675","#E49F51","#F1F060",
+                    "#E9F334","#C46FE5","#87EED9"))[1:length(levels(as.factor(input3$RES_ERREGER)))]
+        
+        names(farben)<-levels(as.factor(input3$RES_ERREGER))
+        
+        ##Clustering: Heatmap, Supervised, 1) Spezies
+        if(length(grep("Daten sortieren nach Spezies",input$cluster_type_klinik_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Daten sortieren nach Spezies'","<br>"), add = TRUE)  
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Daten sortieren nach Spezies", value = 0)
+          
+          #farben<-distinctColorPalette(k=length(levels(as.factor(input3$RES_ERREGER))))
+          #names(farben)<-levels(as.factor(input3$RES_ERREGER))
+          
+          hoehen<-c()
+          weiten<-c()
+          for(i in 1:length(fachbereich)){
+            temp<-input3[input3$ORD_FACHBEREICH==fachbereich[i],]
+            helper<-colSums(temp=="-")
+            temp2<-temp[,helper!=length(temp[,1])]
+            
+            for(j in length(temp2[1,]):erstes_ab){
+              temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+              temp2<-temp2[order(temp2[,j]),]
+              temp2[,j]<-as.character(temp2[,j])
+            }
+            temp2<-temp2[order(temp2$RES_ERREGER),]
+            
+            temp3<-temp2[,erstes_ab:length(temp2[1,])]
+            temp3[temp3=="R"]<-2
+            temp3[temp3=="S"]<-1
+            temp3[temp3=="-"]<-NA
+            temp3[temp3=="I"]<-1.5
+            for(j in 1:length(temp3[1,])){
+              temp3[,j]<-as.numeric(temp3[,j])
+            }
+            colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+            rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+            
+            missing<-colSums(!is.na(temp3))/length(temp3[,1])
+            
+            temp3_2<-as.data.frame(temp3[,missing>0.03])
+            
+            helper<-c()
+            for(j in 1:length(temp2$RES_ERREGER)){
+              helper[j]<-farben[names(farben)==temp2$RES_ERREGER[j]]
+            }
+            names(helper)<-temp2$RES_ERREGER
+            
+            ann_colors = list(
+              Spezies=farben[names(farben)%in%levels(as.factor(temp2$RES_ERREGER))]
+            )
+            names(ann_colors$Spezies)<-levels(as.factor(temp2$RES_ERREGER))
+            
+            my_annot<-data.frame(Spezies=temp2$RES_ERREGER)
+            row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+            
+            fachbereiche<-as.numeric(table(temp2$RES_ERREGER))
+            fachbereiche2<-c()
+            for(j in 1:length(fachbereiche)){
+              fachbereiche2[j]<-sum(fachbereiche[1:j])
+            }
+            
+            if(length(temp3_2[,1])>1){
+              hoehen<-c(hoehen,600)
+              weiten<-c(weiten,1250)
+            }else{
+              hoehen<-c(hoehen,200)
+              weiten<-c(weiten,1000)
+            }
+          }
+          
+          output$plots7 <- renderUI({
+            plot_output_list7 <- lapply(1:length(fachbereich), function(k) {
+              plotname7 <- paste("plot7_", k, sep="")
+              plotOutput(plotname7, height = hoehen[k], width = weiten[k])
+            })
+            do.call(tagList, plot_output_list7)
+          })
+          
+          for(i in 1:length(fachbereich)){
+            local({
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",fachbereich[i]), add = TRUE)  
+              
+              temp<-input3[input3$ORD_FACHBEREICH==fachbereich[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$RES_ERREGER),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              
+              temp3_2<-as.data.frame(temp3[,missing>0.03])
+              
+              helper<-c()
+              for(j in 1:length(temp2$RES_ERREGER)){
+                helper[j]<-farben[names(farben)==temp2$RES_ERREGER[j]]
+              }
+              names(helper)<-temp2$RES_ERREGER
+              
+              ann_colors = list(
+                Spezies=farben[names(farben)%in%levels(as.factor(temp2$RES_ERREGER))]
+              )
+              names(ann_colors$Spezies)<-levels(as.factor(temp2$RES_ERREGER))
+              
+              my_annot<-data.frame(Spezies=temp2$RES_ERREGER)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              fachbereiche<-as.numeric(table(temp2$RES_ERREGER))
+              fachbereiche2<-c()
+              for(j in 1:length(fachbereiche)){
+                fachbereiche2[j]<-sum(fachbereiche[1:j])
+              }
+              
+              output$text_analyse7<-renderText({NULL})
+              
+              
+              my_i <- i
+              plotname7 <- paste("plot7_", my_i, sep="")
+              
+              output[[plotname7]] <- renderPlot({
+                if(length(temp3_2[,1])>1){
+                  
+                  einmalig<-unique(as.vector(as.matrix(temp3_2)))
+                  einmalig<-einmalig[!is.na(einmalig)]
+                  einmalig<-einmalig*2-1
+                  
+                  pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=fachbereich[my_i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(8,floor(240/length(ann_colors$Spezies))), fontsize_col = 5,gaps_col = fachbereiche2)
+                }else{
+                  plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                       yaxt="n",bty="n",main=paste0(fachbereich[my_i]," - kein Clustering möglich"))
+                }
+              })
+
+            })
+            progress$inc(1/length(fachbereich))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Heatmap, Unsupervised: hierarchisches Clustering
+        if(length(grep("Hierarchisches Clustering",input$cluster_type_klinik_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Hierarchisches Clustering'","<br>"), add = TRUE)  
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Hierarchisches Clustering'", value = 0)
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$RES_ERREGER))))
+          #names(farben)<-levels(as.factor(input3$RES_ERREGER))
+          
+          hoehen<-c()
+          weiten<-c()
+          for(i in 1:length(fachbereich)){
+            temp<-input3[input3$ORD_FACHBEREICH==fachbereich[i],]
+            helper<-colSums(temp=="-")
+            temp2<-temp[,helper!=length(temp[,1])]
+            
+            temp2<-temp2[order(temp2$RES_ERREGER),]
+            
+            temp3<-temp2[,erstes_ab:length(temp2[1,])]
+            temp3[temp3=="R"]<-2
+            temp3[temp3=="S"]<-1
+            temp3[temp3=="-"]<-NA
+            temp3[temp3=="I"]<-1.5
+            for(j in 1:length(temp3[1,])){
+              temp3[,j]<-as.numeric(temp3[,j])
+            }
+            colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+            rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+            
+            missing<-colSums(!is.na(temp3))/length(temp3[,1])
+            
+            temp3_2<-as.data.frame(temp3[,missing>0.03])
+
+            if(length(temp3_2[,1])>1){
+              hoehen<-c(hoehen,600)
+              weiten<-c(weiten,1250)
+            }else{
+              hoehen<-c(hoehen,200)
+              weiten<-c(weiten,1000)
+            }
+          }
+          
+          output$plots8 <- renderUI({
+            plot_output_list8 <- lapply(1:length(fachbereich), function(k) {
+              plotname8 <- paste("plot8_", k, sep="")
+              plotOutput(plotname8, height = hoehen[k], width = weiten[k])
+            })
+            do.call(tagList, plot_output_list8)
+          })
+          
+          for(i in 1:length(fachbereich)){
+            local({
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",fachbereich[i]), add = TRUE)  
+              
+              temp<-input3[input3$ORD_FACHBEREICH==fachbereich[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              temp2<-temp2[order(temp2$RES_ERREGER),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.3])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_2b<-as.data.frame(temp3_2[missing>0.3,])
+              temp3_2<-temp3_2b
+              
+              helper<-c()
+              for(j in 1:length(temp2$RES_ERREGER)){
+                helper[j]<-farben[names(farben)==temp2$RES_ERREGER[j]]
+              }
+              names(helper)<-temp2$RES_ERREGER
+              
+              ann_colors = list(
+                Spezies=farben[names(farben)%in%levels(as.factor(temp2$RES_ERREGER))]
+              )
+              names(ann_colors$Spezies)<-levels(as.factor(temp2$RES_ERREGER))
+              
+              my_annot<-data.frame(Spezies=temp2$RES_ERREGER)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              backup_rownames<-rownames(my_annot)[rownames(my_annot)%in%rownames(temp3_2)]
+              my_annot<-as.data.frame(my_annot[rownames(my_annot)%in%rownames(temp3_2),])
+              rownames(my_annot)<-backup_rownames
+              names(my_annot)<-"Spezies"
+              ann_colors$Spezies<-ann_colors$Spezies[names(ann_colors$Spezies)%in%unique(my_annot[,1])]
+              
+              
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2missing<-as.data.frame(temp3[,missing>0.8])
+              
+              missing<-rowSums(!is.na(temp3_2missing))/length(temp3_2missing[1,])
+              temp3_3missing<-as.data.frame(temp3_2missing[missing==1,])
+              row.names(temp3_3missing)<-NULL
+              
+              beste = tryCatch({
+                clusters<-NbClust(temp3_3missing,
+                                  min.nc = 1, max.nc = 5, method = "ward.D",index = "duda")
+                clusters$Best.nc[1]
+              }, error = function(e) {
+                 1
+              })
+
+              output$text_analyse8<-renderText({NULL})
+              
+              my_i <- i
+              plotname8 <- paste("plot8_", my_i, sep="")
+              
+              output[[plotname8]] <- renderPlot({
+                if(length(temp3_2[,1])>1&&beste!=1){
+                  abc=data.frame(x=1)
+                  data<-lapply(abc,function(x){
+                    tryCatch({pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R"),legend_breaks=c(1,1.5,2),
+                                       main=fachbereich[my_i],annotation_col =my_annot,
+                                       cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                                       clustering_method = "ward.D",fontsize = min(8,floor(240/length(ann_colors$Spezies))), fontsize_col = 5,cutree_cols = beste)
+                    },error=function(e) NULL)
+                  })
+                  if(!is.null(data[[1]])){
+                    einmalig<-unique(as.vector(as.matrix(temp3_2)))
+                    einmalig<-einmalig[!is.na(einmalig)]
+                    einmalig<-einmalig*2-1
+
+                    pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=fachbereich[my_i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(9,floor(270/length(ann_colors$Spezies))), fontsize_col = 5,cutree_cols = beste)
+                  }else{
+                    plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                         yaxt="n",bty="n",main=paste0(fachbereich[my_i]," - kein Clustering möglich"))
+                  }
+                }else{
+                  plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                       yaxt="n",bty="n",main=paste0(fachbereich[my_i]," - kein Clustering möglich"))
+                }
+              })
+              
+            })
+            progress$inc(1/length(fachbereich))
+          }
+          progress$close()
+        }
+        
+      }
+      
+      shinyjs::html("text", paste0("<br><br>","Cluster-Analyse erfolgreich durchgeführt.","<br>"), add = TRUE)  
+      
+      
+    })
+    
+    
+ 
+    
+      output$downloadData <- downloadHandler(
+        filename = function() {
+          if(input$report_name=="Standard (Resistenz-Clusteranalyse_<datum>)"){
+            paste("Report_Resistenz-Analyse_", Sys.Date(), ".pdf", sep="")
+          }else{
+            paste(input$download_name_individuell,".pdf", sep="")
+          }
+        },
+        content = function(file) {
+          
+          update_geom_defaults("point", list(size=1))
+          theme_set(theme_grey(base_size=6))
+          
+          pdf(file,width = 22,height = 5,paper = "a4r",pagecentre = T)
+          
+      shinyjs::html("text", paste0("<br>Cluster-Report wird generiert.<br><br>"), add = FALSE)
+      if(is.null(input$download_analysis_type1b)){
+        shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens ein Material aus.","<br>"), add = TRUE)    
+        return()
+      }
+      
+          if(is.null(input$download_analysis_type1)){
+            shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Analyse aus.","<br>"), add = TRUE)    
+            return()
+          }
+      if(length(grep("pro Spezies",input$download_analysis_type1))>0){
+        if(input$download_bak_select=="Nein" && is.null(input$download_bak_selected)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens einen Spezies aus.","<br>"), add = TRUE)    
+          return()
+        }
+        if(is.null(input$download_cluster_type_bak_heat1) && is.null(input$download_cluster_type_bak_umap1)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Analyse aus.","<br>"), add = TRUE)  
+          return()
+        }
+      }
+      if(length(grep("pro Klinik/Fachbereich",input$download_analysis_type1))>0){
+        if(input$download_clinic_select=="Nein" && is.null(input$download_clinic_selected)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Klinik/Fachbereich aus.","<br>"), add = TRUE)    
+          return()
+        }
+        if(is.null(input$download_cluster_type_klinik_heat1)){
+          shinyjs::html("text", paste0("FEHLER: Bitte wählen Sie mindestens eine Analyse aus.","<br>"), add = TRUE)  
+          return()
+        }
+      }
+      
+      
+      #########################
+      ###Eigentliche Analyse###
+      #########################
+      
+      #input2<-read.table("www/Daten_2020-2023_neu_2.txt",
+      #                   header=T,quote = "",comment.char = "",sep="\t",stringsAsFactors = F) 
+      if(!is.null(input$download_analysis_type1c)&&input$download_analysis_type1c==T){
+        input2<-input2[input2$X_STATUS>0,]
+      }
+      #helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        helper1bakterien<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      
+      years_bakterien<-unique(format(helper1bakterien,"%Y"))
+      
+      plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1.5),xlab="",ylab="",xaxt="n",
+           yaxt="n",bty="n",main="")
+      text(x=0.5,y=1.3,"Resistenz-Clusteranalyse",cex=3)
+      text(x=0.5,y=1,Sys.Date(),cex=1.5)
+      ukmlogo<-readPNG("www/UKM.png")
+      rasterImage(ukmlogo,0.3,0,0.4,0.4)
+
+      
+      download_helper1bakterien<-helper1bakterien
+      download_years_bakterien<-years_bakterien
+      
+      #download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      if(input$column4b=="dd.mm.yy"){
+        download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%d.%m.%y")
+      }
+      if(input$column4b=="dd.mm.yyyy"){
+        download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%d.%m.%Y")
+      }
+      if(input$column4b=="mm/dd/yy"){
+        download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%m/%d/%y")
+      }
+      if(input$column4b=="mm/dd/yyyy"){
+        download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%m/%d/%Y")
+      }
+      if(input$column4b=="yy-mm-dd"){
+        download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%y-%m-%d")
+      }
+      if(input$column4b=="yyyy-mm-dd"){
+        download_helper1cluster<-as.Date(input2$ORD_DATUM,format = "%Y-%m-%d")
+      }
+      #if(input$download_analysis_type1b=="Alle"){
+      #  input3<-input2[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a,]
+      #}else{
+      #  input3<-input2[format(download_helper1bakterien,"%Y")==input$download_analysis_type1a&input2$ORD_MATERIAL==input$download_analysis_type1b,]
+      #}
+        input3<-input2[format(download_helper1bakterien,"%Y")%in%input$download_analysis_type1a&input2$ORD_MATERIAL%in%input$download_analysis_type1b,]
+        
+      erstes_ab<-length(grep("_",names(input3)))+1
+
+      ###########
+      ###Plots###
+      ###########
+      
+      
+      ##Pro Spezies
+      download_bakterien<-unique(input3$RES_ERREGER)
+      download_bakterien<-download_bakterien[order(download_bakterien)]
+      download_bakterien<-download_bakterien[as.vector(table(input3$RES_ERREGER))>=30]
+      
+      if(length(grep("pro Spezies",input$download_analysis_type1))>0){
+        if(input$download_bak_select=="Nein"){
+          download_bakterien<-input$download_bak_selected
+        }
+        #message(download_bakterien)
+        
+        plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+             yaxt="n",bty="n",main="")
+        text(x=0.5,y=0.7,"Unabhängige Analyse pro Spezies",cex=2.5)
+        
+        #farben<-distinctColorPalette(k=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+        farben<-c(c("#3E7C90","#F0D7E2","#E69EBB","#EC952E","#DFBDAB","#E3939A","#E7EFAF","#8CB8BA","#9EBC9F","#6A6BE5","#7081A8","#682DE7","#BDF43C","#C5A4F2","#EFE886",
+                    "#D74785","#6FD775","#71A134","#F146B9","#E43260","#B2729B","#99F390","#BEF2D0","#5C5E54","#B8B04A","#89EFE9","#E45F28","#C5BDF4","#7FEDA8","#AAC9F3",
+                    "#70C3B2","#C6B4C2","#67F548","#BBCB7B","#C5EDF0","#9C3F97","#BAF5B8","#46F1C1","#E2F2DC","#8BEDC3","#F2303A","#E7BB92","#A2B2C8","#9C7ABC","#EFBFDC",
+                    "#B3E669","#4D8BDA","#9DECF2","#E64FE0","#40ACB1","#C0EA8E","#EEED39","#5BF4E3","#4DA477","#EBD28D","#EB81B2","#F0C5F3","#87A3E2","#C4C5B1","#D185DE",
+                    "#E47075","#D5E257","#F09CEA","#A09A76","#D532EA","#CFDCEF","#B28AF3","#92D3EA","#AEB8B5","#E5A1D7","#B062E7","#DD77E8","#89545A","#49EC93","#5AD49D",
+                    "#E5BE44","#D77951","#E7E8E5","#C19A97","#DFDEB5","#EDB9BA","#E86ABE","#89CC80","#5AB1DD","#5D57A6","#772FAE","#54E35B","#9D8232","#E2A762","#CEB1D0",
+                    "#B5E5D9","#8FDC44","#DED5F5","#9E96EE","#E39A7B","#46CFBB","#F3DDC9","#B89BC5","#B5D59E","#4FD6E9",
+                    "#B2AE9D","#DFCCF6","#F1B85D","#C9B083","#CFBBC6","#E59692","#EECB4E","#AD7DF2","#DAE0BB","#DAD686","#E8A72F","#DA68C2","#5DBAA9","#605FDD","#7288A8","#F6EC7F",
+                    "#7867AF","#F4E6C5","#E8ACD2","#9BA5F3","#F2D210","#4FF337","#EA98B4","#7CBC35","#E31F84","#A6B467","#CCD770","#B49730","#5D4CE8","#EF1F52","#DF98E5","#B2B6E8",
+                    "#E5C1B9","#AFED7C","#A2F0E1","#36F5ED","#AA7A52","#269173","#8A8953","#96CBE4","#B1D1F8","#F2BDF0","#8FB3DB","#E760E9","#C880CA","#BC8ECD","#6A26E7","#3C89A3",
+                    "#859F9E","#87B963","#3EC7F3","#F2DEF2","#F0EFF2","#ACF2AE","#9C4953","#E76763","#FA9AEA","#84D4A3","#69DEEA","#803A85","#D9F78C","#CD91B3","#FAA8D3","#D5AAE7",
+                    "#80F9F3","#F2C0A2","#48D6C7","#A37380","#3E7E6E","#2EE8C8","#D8F06F","#92F6AB","#CBF7A4","#A2B84F","#3059AC","#CDC26C","#A46EA9","#7392F2","#7530AE","#7AC7EF",
+                    "#746754","#C362EE","#E44C1C","#5EEE9F","#98D6B8","#426B73","#A6C7C7","#ED85F1","#E552A0","#ADD57B","#C8A2A4","#C4ED40","#CFD023","#BA9DB3","#CCDBC4","#B2F6F2",
+                    "#52C2C9","#D1E9BF","#55F476","#8F615B","#AFF62B","#54A8F8","#A2CF9E","#4B95CC","#EBCD6D","#F09367","#EC872D","#EEF29B","#A82AE8","#C5EDE8","#8789CE","#E298D2",
+                    "#396896","#39EAF1","#F6F5BF","#E434EB","#A26BEB","#C377D8","#8BA682","#F1D5A9","#AEDBC6","#CC9BF2","#F8FAB0","#BB2C30","#37F26A","#DCE8A2","#A7A283","#8AD9DE",
+                    "#8279EB","#66C52E","#43EA7B","#DBF1ED","#C3E1A2","#CD49C0","#E7C2E1","#41B858","#D47C70","#99789D","#F32FCE","#CBEFD5","#DCF9BB","#F6E7AF","#B0BBC0","#EC7CAC",
+                    "#B26392","#5AD5EE","#C3ACF1","#ECAFB5","#A289E6","#F17AC7","#3DB9B5","#9350E7","#557DEF","#D84B77","#EDA687","#70D9D0","#F1B0F3","#C3BFDE","#D4D1CC","#89FA58",
+                    "#F1B877","#A932C2","#8DD8C8","#E396F5","#AABFA0","#C96B3F","#C9A180","#75BCF6","#62DA20","#A63FA1","#7BB3A4","#8AF4CD","#DAE2F4","#EFE2D3","#89B0F4","#DFCBAD",
+                    "#BEC390","#3CEEBB","#A2ED65","#A464BB","#FBDC92","#5DF1DF","#3EB6CC","#93F593","#6EC27B","#F3D2D4","#E47B8B","#7E60C0","#81F685","#9998A6","#A5DDF0","#ED46B8",
+                    "#65AE85","#C2EAF5","#C2EEBB","#2EB07B","#689C4A","#3F86DE","#B2F1CD","#F0B8CB","#81D5EE","#76B5C6","#7BF0B8","#EEF8DD","#D8D150","#D5B675","#E49F51","#F1F060",
+                    "#E9F334","#C46FE5","#87EED9"))[1:length(levels(as.factor(input3$ORD_FACHBEREICH)))]
+        
+        names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+        
+        ##Clustering: Heatmap, Supervised, 1) Klinik/Fachbereich, 2) Resistenz
+        if(length(grep("Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz",input$download_cluster_type_bak_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz",cex=1.5)
+          
+          
+          #farben<-distinctColorPalette(k=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Resistenz", value = 0)
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              
+              temp3_2<-as.data.frame(temp3[,missing>0.03])
+              
+              helper<-c()
+              for(j in 1:length(temp2$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              fachbereiche<-as.numeric(table(temp2$ORD_FACHBEREICH))
+              fachbereiche2<-c()
+              for(j in 1:length(fachbereiche)){
+                fachbereiche2[j]<-sum(fachbereiche[1:j])
+              }
+              
+              einmalig<-unique(as.vector(as.matrix(temp3_2)))
+              einmalig<-einmalig[!is.na(einmalig)]
+              einmalig<-einmalig*2-1
+
+              print(pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                         main=download_bakterien[i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                         cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                         clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))), fontsize_col = 5,gaps_col = fachbereiche2))
+
+              progress$inc(1/length(download_bakterien))
+          }
+          progress$close()
+          }
+
+        ##Clustering: Heatmap, Supervised, 1) Klinik/Fachbereich, 2) Datum
+        if(length(grep("Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum",input$download_cluster_type_bak_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum'","<br>"), add = TRUE)  
+
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum",cex=1.5)
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Daten sortieren nach 1) Klinik/Fachbereich, 2) Datum", value = 0)
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              temp2$ORD_DATUM<-as.Date(temp2$ORD_DATUM,format = "%d.%m.%Y")
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH,temp2$ORD_DATUM),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              
+              temp3_2<-as.data.frame(temp3[,missing>0.03])
+              
+              helper<-c()
+              for(j in 1:length(temp2$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                #Fachbereich = rainbow(n=length(levels(as.factor(temp2$ORD_FACHBEREICH)))),
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              fachbereiche<-as.numeric(table(temp2$ORD_FACHBEREICH))
+              fachbereiche2<-c()
+              for(j in 1:length(fachbereiche)){
+                fachbereiche2[j]<-sum(fachbereiche[1:j])
+              }
+
+              einmalig<-unique(as.vector(as.matrix(temp3_2)))
+              einmalig<-einmalig[!is.na(einmalig)]
+              einmalig<-einmalig*2-1
+              
+              print(pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                             main=download_bakterien[i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                             cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                             clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))),
+                             fontsize_col = 5,gaps_col = fachbereiche2))
+              
+              progress$inc(1/length(download_bakterien))
+                
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Heatmap, Supervised, 1) Klinik/Fachbereich, 2) Datum
+        if(length(grep("Hierarchisches Clustering",input$download_cluster_type_bak_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Hierarchisches Clustering'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Hierarchisches Clustering",cex=1.5)
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Hierarchisches Clustering", value = 0)
+          
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+              rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(as.data.frame(temp3[,missing>0.3]))
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_2b<-as.data.frame(temp3_2[missing>0.3,])
+              temp3_2<-temp3_2b
+              
+              helper<-c()
+              for(j in 1:length(temp2$ORD_FACHBEREICH)){
+                helper[j]<-farben[names(farben)==temp2$ORD_FACHBEREICH[j]]
+              }
+              names(helper)<-temp2$ORD_FACHBEREICH
+              
+              ann_colors = list(
+                #Fachbereich = rainbow(n=length(levels(as.factor(temp2$ORD_FACHBEREICH)))),
+                Fachbereich=farben[names(farben)%in%levels(as.factor(temp2$ORD_FACHBEREICH))]
+              )
+              names(ann_colors$Fachbereich)<-levels(as.factor(temp2$ORD_FACHBEREICH))
+              
+              my_annot<-data.frame(Fachbereich=temp2$ORD_FACHBEREICH)
+              row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+              
+              backup_rownames<-rownames(my_annot)[rownames(my_annot)%in%rownames(temp3_2)]
+              my_annot<-as.data.frame(my_annot[rownames(my_annot)%in%rownames(temp3_2),])
+              rownames(my_annot)<-backup_rownames
+              names(my_annot)<-"Fachbereich"
+              ann_colors$Fachbereich<-ann_colors$Fachbereich[names(ann_colors$Fachbereich)%in%unique(my_annot[,1])]
+              
+              
+              
+              
+              output$text_analyse3<-renderText({NULL})
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2missing<-as.data.frame(temp3[,missing>0.8])
+              
+              missing<-rowSums(!is.na(temp3_2missing))/length(temp3_2missing[1,])
+              temp3_3missing<-as.data.frame(temp3_2missing[missing==1,])
+              row.names(temp3_3missing)<-NULL
+
+              if(length(temp3_3missing[,1])<100){
+                beste = tryCatch({
+                  clusters<-NbClust(temp3_3missing,
+                                    min.nc = 1, max.nc = 5, method = "ward.D",index = "duda")
+                  clusters$Best.nc[1]
+                }, error = function(e) {
+                  1
+                })
+              }else{
+                beste = tryCatch({
+                  clusters<-NbClust(temp3_3missing,
+                                    min.nc = 1, max.nc = 10, method = "ward.D",index = "duda")
+                  clusters$Best.nc[1]
+                }, error = function(e) {
+                  1
+                })
+              }
+              
+              
+              einmalig<-unique(as.vector(as.matrix(temp3_2)))
+              einmalig<-einmalig[!is.na(einmalig)]
+              einmalig<-einmalig*2-1
+
+              download_abc=data.frame(x=1)
+              download_data<-lapply(download_abc,function(x){
+                tryCatch({
+                  pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=download_bakterien[i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))),
+                           fontsize_col = 5,cutree_cols = beste,silent=T)
+                  
+                },error=function(e) NULL)
+              })
+              if(length(temp3_2[,1])>1&&beste!=1&&!is.null(download_data[[1]])){
+                print(pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                               main=download_bakterien[i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                               cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                               clustering_method = "ward.D",fontsize = min(7,floor(210/length(ann_colors$Spezies))),
+                               fontsize_col = 5,cutree_cols = beste))
+              }else{
+                print(plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                           yaxt="n",bty="n",main=paste0(download_bakterien[i]," - kein Clustering möglich")))
+              }
+                
+              progress$inc(1/length(download_bakterien))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: UMAP mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Plot mit eingefärbten Kliniken/Fachbereichen",input$download_cluster_type_bak_umap1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle UMAP 'Plot mit eingefärbten Kliniken/Fachbereichen'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"UMAP",cex=2.5)
+          text(x=0.5,y=0.4,"Plot mit eingefärbten Kliniken/Fachbereichen",cex=1.5)
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle UMAP 'Plot mit eingefärbten Kliniken/Fachbereichen", value = 0)
+          
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              shinyjs::html("text", paste0(" (",length(temp[,1]),"x",length(temp[1,]),"=",length(temp[,1])*length(temp[1,])," Elemente)"), add = TRUE)
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+                colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+                rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+                
+                helper<-c()
+                for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                  helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+                }
+                names(helper)<-temp2_3$ORD_FACHBEREICH
+                
+                ann_colors = list(
+                  Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+                )
+                names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                
+                my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+                row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+                
+                
+              
+              download_abc=data.frame(x=1)
+              download_data<-lapply(download_abc,function(x){
+                tryCatch({
+                  pdf(file = NULL)
+                  M3C::umap(t(as.matrix(temp3_3)),labels=names(helper),colvec = helper,seed = 42,legendtextsize = 7) + ggtitle(download_bakterien[i]) + 
+                                 theme(plot.title = element_text(size = 15,hjust = 0.5))
+                  dev.off()
+                },error=function(e) NULL)
+              })
+              if(!is.null(download_data[[1]])){
+                print(M3C::umap(t(as.matrix(temp3_3)),legendtextsize = min(5,floor(150/length(unique(names(helper))))), 
+                                labels=names(helper),colvec = helper,seed = 42,controlscale = T,scale=3,dotsize=2) + ggtitle(download_bakterien[i]) + 
+                        theme(plot.title = element_text(size = 15,hjust = 0.5,face="bold"))+xlab("UMAP 1")+ylab("UMAP 2"))
+              }else{
+                dev.off()
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                     main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              }else{
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                           main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n")) 
+              }
+              progress$inc(1/length(download_bakterien))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Clustering: UMAP mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Plot mit eingefärbten Clustern",input$download_cluster_type_bak_umap1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle UMAP 'Plot mit eingefärbten Clustern'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"UMAP",cex=2.5)
+          text(x=0.5,y=0.4,"Plot mit eingefärbten Clustern",cex=1.5)
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          moeglich_speicher<-c()
+          partition_speicher<-list()      
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle UMAP 'Plot mit eingefärbten Clustern", value = 0)
+          
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              shinyjs::html("text", paste0(" (",length(temp[,1]),"x",length(temp[1,]),"=",length(temp[,1])*length(temp[1,])," Elemente)"), add = TRUE)
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+                colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+                rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+                
+                helper<-c()
+                for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                  helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+                }
+                names(helper)<-temp2_3$ORD_FACHBEREICH
+                
+                ann_colors = list(
+                  Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+                )
+                names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                
+                my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+                row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+                download_abc=data.frame(x=1)
+                download_data<-lapply(download_abc,function(x){
+                  tryCatch({
+                    pdf(file = NULL)
+                    alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                    test<-data.frame(alt$data)
+                  
+                    clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+                    clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="kl")
+                    clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="ch")
+                    clusters4<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="scott")
+                    clusters5<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+                    clusters6<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="dunn")
+                    
+                    dev.off()
+                  },error=function(e) NULL)
+                })
+                if(!is.null(download_data[[1]])){
+                  alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                  test<-data.frame(alt$data)
+                  pdf(file = NULL)
+                  clusters2<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="silhouette")
+                  clusters1<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="kl")
+                  clusters3<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="ch")
+                  clusters4<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="scott")
+                  clusters5<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="duda")
+                  clusters6<-NbClust(data = test, diss = NULL, distance = "euclidean",min.nc = 2, max.nc = 5, method = "kmeans",index="dunn")
+                  dev.off()
+                
+                  beste<-table(c(clusters1$Best.nc[1],clusters4$Best.nc[1],clusters3$Best.nc[1],clusters5$Best.nc[1],clusters6$Best.nc[1]))
+                  if(beste[max(beste)==beste][1]>=2&&
+                     sd(clusters1$All.index)>=5&&sd(clusters2$All.index)>=0.05){
+                    moeglich_speicher[i]<-moeglich<-as.numeric(min(names(beste[max(beste)==beste][1])))
+                    if(moeglich==clusters1$Best.nc[1]){
+                      best_cluster<-clusters1
+                    }else{
+                      if(moeglich==clusters3$Best.nc[1]){
+                        best_cluster<-clusters3
+                      }else{
+                        if(moeglich==clusters4$Best.nc[1]){
+                          best_cluster<-clusters4
+                        }else{
+                          if(moeglich==clusters5$Best.nc[1]){
+                            best_cluster<-clusters5
+                          }
+                        }
+                      }
+                    }
+                    partition_speicher[[i]]<-partition<-best_cluster$Best.partition
+                  }else{
+                    moeglich_speicher[i]<-moeglich<-0
+                    partition_speicher[[i]]<-partition<-NA
+                  }
+  
+                  
+                  
+                if(moeglich>0){
+                  print(M3C::umap(t(as.matrix(temp3_3)),labels=as.factor(partition),
+                                  legendtextsize = min(5,floor(150/length(unique(names(helper))))), 
+                                  seed=42,colvec = col_vec[1:length(levels(as.factor(partition)))],
+                                  controlscale = T,scale=3) + 
+                          ggtitle(download_bakterien[i]) + 
+                          theme(plot.title = element_text(size = 20,hjust = 0.5,face="bold"))+xlab("UMAP 1")+ylab("UMAP 2"))
+                  
+                }else{
+                  print(M3C::umap(t(as.matrix(temp3_3)),labels=names(helper),colvec = helper,seed = 42,controlscale = T,scale=3,dotsize=2,
+                                  legendtextsize = min(5,floor(150/length(unique(names(helper)))))) + 
+                          ggtitle(paste0(download_bakterien[i]," - kein eindeutiges Clustering möglich")) + 
+                          theme(plot.title = element_text(size = 13,hjust = 0.5,face="bold"))+xlab("UMAP 1")+ylab("UMAP 2"))
+                }
+              }else{
+                dev.off()
+                moeglich_speicher[i]<-NA
+                partition_speicher[[i]]<-NA
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                           main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              }else{
+                moeglich_speicher[i]<-NA
+                partition_speicher[[i]]<-NA
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                           main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              progress$inc(1/length(download_bakterien))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Zusätzliche Heatmap supervised nach UMAP-Clustern mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Daten sortieren nach UMAP-Clustern",input$download_cluster_type_bak_umap2,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle zusätzliche Heatmap 'Daten sortieren nach UMAP-Clustern'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Daten sortieren nach UMAP-Clustern",cex=1.5)
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle zusätzliche Heatmap 'Daten sortieren nach UMAP-Clustern", value = 0)
+
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+                colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+                rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+                
+                helper<-c()
+                for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                  helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+                }
+                names(helper)<-temp2_3$ORD_FACHBEREICH
+                
+                ann_colors = list(
+                  Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+                )
+                names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                
+                my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+                row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+
+                if(!is.na(moeglich_speicher[i])){
+                  alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                  test<-data.frame(alt$data)
+                  
+                  moeglich<-moeglich_speicher[i]
+                  partition<-partition_speicher[[i]]
+
+                if(moeglich>0){
+                  soll_order<-partition[order(partition)]
+                  
+                  temp3_3_ordered<-temp3_3[match(names(soll_order),row.names(temp3_3)),]
+                  my_annot_ordered<-as.data.frame(my_annot[match(names(soll_order),row.names(temp3_3)),])
+                  colnames(my_annot_ordered)<-c("Fachbereich")
+                  
+                  fachbereiche<-as.numeric(table(soll_order))
+                  fachbereiche2<-c()
+                  for(m in 1:length(fachbereiche)){
+                    fachbereiche2[m]<-sum(fachbereiche[1:m])
+                  }
+                  
+                  my_annot_ordered<-cbind(my_annot_ordered,Cluster=as.character(soll_order))
+                  rownames(my_annot_ordered)<-rownames(temp3_3_ordered)
+                  
+                  ann_colors = list(
+                    Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))],
+                    Cluster = col_vec[1:length(levels(as.factor(my_annot_ordered$Cluster)))]
+                  )
+                  names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                  names(ann_colors$Cluster)<-levels(as.factor(my_annot_ordered$Cluster))
+                  
+                  einmalig<-unique(as.vector(as.matrix(temp3_3_ordered)))
+                  einmalig<-einmalig[!is.na(einmalig)]
+                  einmalig<-einmalig*2-1
+                  
+                  print(pheatmap(t(as.matrix(temp3_3_ordered)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=download_bakterien[i],annotation_col =my_annot_ordered,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize =  min(6,floor(180/length(ann_colors$Spezies))),
+                           fontsize_col = 5,gaps_col = fachbereiche2))
+                  
+                }else{
+                  fachbereiche<-as.numeric(table(temp2_3$ORD_FACHBEREICH))
+                  fachbereiche2<-c()
+                  for(j in 1:length(fachbereiche)){
+                    fachbereiche2[j]<-sum(fachbereiche[1:j])
+                  }
+                  
+                  einmalig<-unique(as.vector(as.matrix(temp3_3)))
+                  einmalig<-einmalig[!is.na(einmalig)]
+                  einmalig<-einmalig*2-1
+                  
+                  print(pheatmap(t(as.matrix(temp3_3)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=paste0(download_bakterien[i]," - kein eindeutiges Clustering möglich"),annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))), 
+                           fontsize_col = 5,gaps_col = fachbereiche2))
+                }
+              }else{
+                #dev.off()
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                     main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              }else{
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                           main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              progress$inc(1/length(download_bakterien))
+          }
+          progress$close()
+        }
+          
+        ##Clustering: Zusätzliche Heatmap supervised nach Kliniken/Fachbereichen mit eingefärbten Kliniken/Fachbereichen
+        if(length(grep("Daten sortieren nach Kliniken/Fachbereichen",input$download_cluster_type_bak_umap2,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle zusätzliche Heatmap 'Daten sortieren nach Kliniken/Fachbereichen'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Daten sortieren nach Kliniken/Fachbereichen",cex=1.5)
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$ORD_FACHBEREICH))))
+          #names(farben)<-levels(as.factor(input3$ORD_FACHBEREICH))
+          
+          col_vec<-c("skyblue","gold", "violet", "darkorchid", "slateblue", "forestgreen", "violetred",
+                     "orange", "midnightblue", "grey31", "black")
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle zusätzliche Heatmap 'Daten sortieren nach Kliniken/Fachbereichen", value = 0)
+
+          for(i in 1:length(download_bakterien)){
+              shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_bakterien[i]), add = TRUE)  
+              
+              temp<-input3[input3$RES_ERREGER==download_bakterien[i],]
+              helper<-colSums(temp=="-")
+              temp2<-temp[,helper!=length(temp[,1])]
+              
+              for(j in length(temp2[1,]):erstes_ab){
+                temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+                temp2<-temp2[order(temp2[,j]),]
+                temp2[,j]<-as.character(temp2[,j])
+              }
+              temp2<-temp2[order(temp2$ORD_FACHBEREICH),]
+              
+              temp3<-temp2[,erstes_ab:length(temp2[1,])]
+              temp3[temp3=="R"]<-2
+              temp3[temp3=="S"]<-1
+              temp3[temp3=="-"]<-NA
+              temp3[temp3=="I"]<-1.5
+              for(j in 1:length(temp3[1,])){
+                temp3[,j]<-as.numeric(temp3[,j])
+              }
+              
+              missing<-colSums(!is.na(temp3))/length(temp3[,1])
+              temp3_2<-as.data.frame(temp3[,missing>0.8])
+              temp2_2<-as.data.frame(temp2[,c(1:(erstes_ab-1),which(missing>0.8)+(erstes_ab-1))])
+              
+              missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+              temp3_3<-as.data.frame(temp3_2[missing==1,])
+              temp2_3<-as.data.frame(temp2_2[missing==1,])
+              
+              if(length(temp3_3)>0&&length(temp2_3)>0){
+                colnames(temp3_3)<-names(temp2_3)[erstes_ab:length(temp2_3[1,])] 
+                rownames(temp3_3)<-paste0("A",1:length(temp3_3[,1]))
+                
+                helper<-c()
+                for(j in 1:length(temp2_3$ORD_FACHBEREICH)){
+                  helper[j]<-farben[names(farben)==temp2_3$ORD_FACHBEREICH[j]]
+                }
+                names(helper)<-temp2_3$ORD_FACHBEREICH
+                
+                ann_colors = list(
+                  Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))]
+                )
+                names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                
+                my_annot<-data.frame(Fachbereich=temp2_3$ORD_FACHBEREICH)
+                row.names(my_annot)<-paste0("A",1:length(temp3_3[,1]))
+              
+                if(!is.na(moeglich_speicher[i])){
+                  alt<-umap(t(as.matrix(temp3_3)),seed = 42)
+                  test<-data.frame(alt$data)
+                  
+                  moeglich<-moeglich_speicher[i]
+                  partition<-partition_speicher[[i]]
+
+                if(moeglich>0){
+                  soll_order<-partition[order(my_annot$Fachbereich,partition)]
+                  
+                  temp3_3_ordered<-temp3_3[match(names(soll_order),row.names(temp3_3)),]
+                  my_annot_ordered<-as.data.frame(my_annot[match(names(soll_order),row.names(temp3_3)),])
+                  colnames(my_annot_ordered)<-c("Fachbereich")
+                  
+                  fachbereiche<-as.numeric(table(my_annot_ordered$Fachbereich))
+                  fachbereiche2<-c()
+                  for(m in 1:length(fachbereiche)){
+                    fachbereiche2[m]<-sum(fachbereiche[1:m])
+                  }
+                  
+                  my_annot_ordered<-cbind(my_annot_ordered,Cluster=as.character(soll_order))
+                  rownames(my_annot_ordered)<-rownames(temp3_3_ordered)
+                  
+                  ann_colors = list(
+                    Fachbereich=farben[names(farben)%in%levels(as.factor(temp2_3$ORD_FACHBEREICH))],
+                    Cluster = col_vec[1:length(levels(as.factor(my_annot_ordered$Cluster)))]
+                  )
+                  names(ann_colors$Fachbereich)<-levels(as.factor(temp2_3$ORD_FACHBEREICH))
+                  names(ann_colors$Cluster)<-levels(as.factor(my_annot_ordered$Cluster))
+                  
+                  einmalig<-unique(as.vector(as.matrix(temp3_3_ordered)))
+                  einmalig<-einmalig[!is.na(einmalig)]
+                  einmalig<-einmalig*2-1
+                  
+                  print(pheatmap(t(as.matrix(temp3_3_ordered)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=download_bakterien[i],annotation_col =my_annot_ordered,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))),
+                           fontsize_col = 5,gaps_col = fachbereiche2))
+                  
+                }else{
+                  fachbereiche<-as.numeric(table(temp2_3$ORD_FACHBEREICH))
+                  fachbereiche2<-c()
+                  for(j in 1:length(fachbereiche)){
+                    fachbereiche2[j]<-sum(fachbereiche[1:j])
+                  }
+                  
+                  einmalig<-unique(as.vector(as.matrix(temp3_3)))
+                  einmalig<-einmalig[!is.na(einmalig)]
+                  einmalig<-einmalig*2-1
+                  
+                  print(pheatmap(t(as.matrix(temp3_3)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                           main=paste0(download_bakterien[i]," - kein eindeutiges Clustering möglich"),annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                           cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                           clustering_method = "ward.D",fontsize = min(6,floor(180/length(ann_colors$Spezies))),
+                           fontsize_col = 5,gaps_col = fachbereiche2))
+                }
+              }else{
+                #dev.off()
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                     main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              }else{
+                print(plot(NULL,xlim=c(0,1),ylim=c(0,1),xaxt="n",yaxt="n",xlab="",ylab="",
+                     main=paste0(download_bakterien[i]," - Datenlage nicht ausreichend"),bty="n"))
+              }
+              progress$inc(1/length(download_bakterien))
+          }
+          progress$close()
+      }
+      
+      }
+      
+      ##Pro Klinik/Fachbereich
+      download_fachbereich<-unique(input3$ORD_FACHBEREICH)
+      download_fachbereich<-download_fachbereich[order(download_fachbereich)]
+      download_fachbereich<-download_fachbereich[as.vector(table(input3$ORD_FACHBEREICH))>=30]
+      
+      
+      if(length(grep("pro Klinik/Fachbereich",input$download_analysis_type1))>0){
+        if(input$download_clinic_select=="Nein"){
+          download_fachbereich<-input$download_clinic_selected
+        }
+        
+        plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+             yaxt="n",bty="n",main="")
+        text(x=0.5,y=0.7,"Unabhängige Analyse pro Klinik/Fachbereich",cex=2.5)
+        
+#        farben<-distinctColorPalette(k=length(levels(as.factor(input3$RES_ERREGER))))
+        farben<-c(c("#3E7C90","#F0D7E2","#E69EBB","#EC952E","#DFBDAB","#E3939A","#E7EFAF","#8CB8BA","#9EBC9F","#6A6BE5","#7081A8","#682DE7","#BDF43C","#C5A4F2","#EFE886",
+                    "#D74785","#6FD775","#71A134","#F146B9","#E43260","#B2729B","#99F390","#BEF2D0","#5C5E54","#B8B04A","#89EFE9","#E45F28","#C5BDF4","#7FEDA8","#AAC9F3",
+                    "#70C3B2","#C6B4C2","#67F548","#BBCB7B","#C5EDF0","#9C3F97","#BAF5B8","#46F1C1","#E2F2DC","#8BEDC3","#F2303A","#E7BB92","#A2B2C8","#9C7ABC","#EFBFDC",
+                    "#B3E669","#4D8BDA","#9DECF2","#E64FE0","#40ACB1","#C0EA8E","#EEED39","#5BF4E3","#4DA477","#EBD28D","#EB81B2","#F0C5F3","#87A3E2","#C4C5B1","#D185DE",
+                    "#E47075","#D5E257","#F09CEA","#A09A76","#D532EA","#CFDCEF","#B28AF3","#92D3EA","#AEB8B5","#E5A1D7","#B062E7","#DD77E8","#89545A","#49EC93","#5AD49D",
+                    "#E5BE44","#D77951","#E7E8E5","#C19A97","#DFDEB5","#EDB9BA","#E86ABE","#89CC80","#5AB1DD","#5D57A6","#772FAE","#54E35B","#9D8232","#E2A762","#CEB1D0",
+                    "#B5E5D9","#8FDC44","#DED5F5","#9E96EE","#E39A7B","#46CFBB","#F3DDC9","#B89BC5","#B5D59E","#4FD6E9",
+                    "#B2AE9D","#DFCCF6","#F1B85D","#C9B083","#CFBBC6","#E59692","#EECB4E","#AD7DF2","#DAE0BB","#DAD686","#E8A72F","#DA68C2","#5DBAA9","#605FDD","#7288A8","#F6EC7F",
+                    "#7867AF","#F4E6C5","#E8ACD2","#9BA5F3","#F2D210","#4FF337","#EA98B4","#7CBC35","#E31F84","#A6B467","#CCD770","#B49730","#5D4CE8","#EF1F52","#DF98E5","#B2B6E8",
+                    "#E5C1B9","#AFED7C","#A2F0E1","#36F5ED","#AA7A52","#269173","#8A8953","#96CBE4","#B1D1F8","#F2BDF0","#8FB3DB","#E760E9","#C880CA","#BC8ECD","#6A26E7","#3C89A3",
+                    "#859F9E","#87B963","#3EC7F3","#F2DEF2","#F0EFF2","#ACF2AE","#9C4953","#E76763","#FA9AEA","#84D4A3","#69DEEA","#803A85","#D9F78C","#CD91B3","#FAA8D3","#D5AAE7",
+                    "#80F9F3","#F2C0A2","#48D6C7","#A37380","#3E7E6E","#2EE8C8","#D8F06F","#92F6AB","#CBF7A4","#A2B84F","#3059AC","#CDC26C","#A46EA9","#7392F2","#7530AE","#7AC7EF",
+                    "#746754","#C362EE","#E44C1C","#5EEE9F","#98D6B8","#426B73","#A6C7C7","#ED85F1","#E552A0","#ADD57B","#C8A2A4","#C4ED40","#CFD023","#BA9DB3","#CCDBC4","#B2F6F2",
+                    "#52C2C9","#D1E9BF","#55F476","#8F615B","#AFF62B","#54A8F8","#A2CF9E","#4B95CC","#EBCD6D","#F09367","#EC872D","#EEF29B","#A82AE8","#C5EDE8","#8789CE","#E298D2",
+                    "#396896","#39EAF1","#F6F5BF","#E434EB","#A26BEB","#C377D8","#8BA682","#F1D5A9","#AEDBC6","#CC9BF2","#F8FAB0","#BB2C30","#37F26A","#DCE8A2","#A7A283","#8AD9DE",
+                    "#8279EB","#66C52E","#43EA7B","#DBF1ED","#C3E1A2","#CD49C0","#E7C2E1","#41B858","#D47C70","#99789D","#F32FCE","#CBEFD5","#DCF9BB","#F6E7AF","#B0BBC0","#EC7CAC",
+                    "#B26392","#5AD5EE","#C3ACF1","#ECAFB5","#A289E6","#F17AC7","#3DB9B5","#9350E7","#557DEF","#D84B77","#EDA687","#70D9D0","#F1B0F3","#C3BFDE","#D4D1CC","#89FA58",
+                    "#F1B877","#A932C2","#8DD8C8","#E396F5","#AABFA0","#C96B3F","#C9A180","#75BCF6","#62DA20","#A63FA1","#7BB3A4","#8AF4CD","#DAE2F4","#EFE2D3","#89B0F4","#DFCBAD",
+                    "#BEC390","#3CEEBB","#A2ED65","#A464BB","#FBDC92","#5DF1DF","#3EB6CC","#93F593","#6EC27B","#F3D2D4","#E47B8B","#7E60C0","#81F685","#9998A6","#A5DDF0","#ED46B8",
+                    "#65AE85","#C2EAF5","#C2EEBB","#2EB07B","#689C4A","#3F86DE","#B2F1CD","#F0B8CB","#81D5EE","#76B5C6","#7BF0B8","#EEF8DD","#D8D150","#D5B675","#E49F51","#F1F060",
+                    "#E9F334","#C46FE5","#87EED9"))[1:length(levels(as.factor(input3$RES_ERREGER)))]
+        
+        names(farben)<-levels(as.factor(input3$RES_ERREGER))
+        
+        ##Clustering: Heatmap, Supervised, 1) Spezies
+        if(length(grep("Daten sortieren nach Spezies",input$download_cluster_type_klinik_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Daten sortieren nach Spezies'","<br>"), add = TRUE)  
+          
+          #farben<-distinctColorPalette(k=length(levels(as.factor(input3$RES_ERREGER))))
+          #names(farben)<-levels(as.factor(input3$RES_ERREGER))
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Daten sortieren nach Spezies",cex=1.5)
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Daten sortieren nach Spezies", value = 0)
+          
+          for(i in 1:length(download_fachbereich)){
+            shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_fachbereich[i]), add = TRUE)  
+            
+            temp<-input3[input3$ORD_FACHBEREICH==download_fachbereich[i],]
+            helper<-colSums(temp=="-")
+            temp2<-temp[,helper!=length(temp[,1])]
+            
+            for(j in length(temp2[1,]):erstes_ab){
+              temp2[,j]<-ordered(temp2[,j],c("R","I","S","-"))
+              temp2<-temp2[order(temp2[,j]),]
+              temp2[,j]<-as.character(temp2[,j])
+            }
+            temp2<-temp2[order(temp2$RES_ERREGER),]
+            
+            temp3<-temp2[,erstes_ab:length(temp2[1,])]
+            temp3[temp3=="R"]<-2
+            temp3[temp3=="S"]<-1
+            temp3[temp3=="-"]<-NA
+            temp3[temp3=="I"]<-1.5
+            for(j in 1:length(temp3[1,])){
+              temp3[,j]<-as.numeric(temp3[,j])
+            }
+            colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+            rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+            
+            missing<-colSums(!is.na(temp3))/length(temp3[,1])
+            
+            temp3_2<-as.data.frame(temp3[,missing>0.03])
+            
+            helper<-c()
+            for(j in 1:length(temp2$RES_ERREGER)){
+              helper[j]<-farben[names(farben)==temp2$RES_ERREGER[j]]
+            }
+            names(helper)<-temp2$RES_ERREGER
+            
+            ann_colors = list(
+              Spezies=farben[names(farben)%in%levels(as.factor(temp2$RES_ERREGER))]
+            )
+            names(ann_colors$Spezies)<-levels(as.factor(temp2$RES_ERREGER))
+            
+            my_annot<-data.frame(Spezies=temp2$RES_ERREGER)
+            row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+            
+            fachbereiche<-as.numeric(table(temp2$RES_ERREGER))
+            fachbereiche2<-c()
+            for(j in 1:length(fachbereiche)){
+              fachbereiche2[j]<-sum(fachbereiche[1:j])
+            }
+            
+            if(length(temp3_2[,1])>1){
+              einmalig<-unique(as.vector(as.matrix(temp3_2)))
+              einmalig<-einmalig[!is.na(einmalig)]
+              einmalig<-einmalig*2-1
+              
+              print(pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                       main=download_fachbereich[i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                       cluster_rows = F,cluster_cols = F,show_colnames = F,annotation_colors=ann_colors,
+                       clustering_method = "ward.D",fontsize = min(8,floor(240/length(ann_colors$Spezies))),
+                       fontsize_col = 5,gaps_col = fachbereiche2))
+            }else{
+              print(plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                   yaxt="n",bty="n",main=paste0(download_fachbereich[i]," - kein Clustering möglich"),cex.main=0.8))
+            }
+            progress$inc(1/length(download_fachbereich))
+          }
+          progress$close()
+        }
+        
+        ##Clustering: Heatmap, Unsupervised: hierarchisches Clustering
+        if(length(grep("Hierarchisches Clustering",input$download_cluster_type_klinik_heat1,fixed=T))>0){
+          shinyjs::html("text", paste0("<br><br>","&nbsp&nbsp&nbspErstelle Heatmap 'Hierarchisches Clustering'","<br>"), add = TRUE)  
+          
+          plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+               yaxt="n",bty="n",main="")
+          text(x=0.5,y=0.7,"Heatmap",cex=2.5)
+          text(x=0.5,y=0.4,"Hierarchisches Clustering",cex=1.5)
+          
+          
+          #farben<-rainbow(n=length(levels(as.factor(input3$RES_ERREGER))))
+          #names(farben)<-levels(as.factor(input3$RES_ERREGER))
+          
+          progress <- shiny::Progress$new()
+          progress$set(message = "Erstelle Heatmap 'Hierarchisches Clustering'", value = 0)
+          
+          for(i in 1:length(download_fachbereich)){
+            shinyjs::html("text", paste0("<br>","&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp",download_fachbereich[i]), add = TRUE)  
+            
+            temp<-input3[input3$ORD_FACHBEREICH==download_fachbereich[i],]
+            helper<-colSums(temp=="-")
+            temp2<-temp[,helper!=length(temp[,1])]
+            
+            temp2<-temp2[order(temp2$RES_ERREGER),]
+            
+            temp3<-temp2[,erstes_ab:length(temp2[1,])]
+            temp3[temp3=="R"]<-2
+            temp3[temp3=="S"]<-1
+            temp3[temp3=="-"]<-NA
+            temp3[temp3=="I"]<-1.5
+            for(j in 1:length(temp3[1,])){
+              temp3[,j]<-as.numeric(temp3[,j])
+            }
+            colnames(temp3)<-names(temp2)[erstes_ab:length(temp2[1,])] 
+            rownames(temp3)<-paste0("A",1:length(temp3[,1]))
+            
+            missing<-colSums(!is.na(temp3))/length(temp3[,1])
+            temp3_2<-as.data.frame(temp3[,missing>0.3])
+            
+            missing<-rowSums(!is.na(temp3_2))/length(temp3_2[1,])
+            temp3_2b<-as.data.frame(temp3_2[missing>0.3,])
+            temp3_2<-temp3_2b
+            
+            helper<-c()
+            for(j in 1:length(temp2$RES_ERREGER)){
+              helper[j]<-farben[names(farben)==temp2$RES_ERREGER[j]]
+            }
+            names(helper)<-temp2$RES_ERREGER
+            
+            ann_colors = list(
+              Spezies=farben[names(farben)%in%levels(as.factor(temp2$RES_ERREGER))]
+            )
+            names(ann_colors$Spezies)<-levels(as.factor(temp2$RES_ERREGER))
+            
+            my_annot<-data.frame(Spezies=temp2$RES_ERREGER)
+            row.names(my_annot)<-paste0("A",1:length(temp3[,1]))
+            
+            backup_rownames<-rownames(my_annot)[rownames(my_annot)%in%rownames(temp3_2)]
+            my_annot<-as.data.frame(my_annot[rownames(my_annot)%in%rownames(temp3_2),])
+            rownames(my_annot)<-backup_rownames
+            names(my_annot)<-"Spezies"
+            ann_colors$Spezies<-ann_colors$Spezies[names(ann_colors$Spezies)%in%unique(my_annot[,1])]
+            
+            
+            
+            missing<-colSums(!is.na(temp3))/length(temp3[,1])
+            temp3_2missing<-as.data.frame(temp3[,missing>0.8])
+            
+            missing<-rowSums(!is.na(temp3_2missing))/length(temp3_2missing[1,])
+            temp3_3missing<-as.data.frame(temp3_2missing[missing==1,])
+            row.names(temp3_3missing)<-NULL
+            
+            beste = tryCatch({
+              clusters<-NbClust(temp3_3missing,
+                                min.nc = 1, max.nc = 5, method = "ward.D",index = "duda")
+              clusters$Best.nc[1]
+            }, error = function(e) {
+              1
+            })
+            
+            if(length(temp3_2[,1])>1&&beste!=1){
+              download_abc=data.frame(x=1)
+              download_data<-lapply(download_abc,function(x){
+                tryCatch({
+                  test_plot<-pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R"),legend_breaks=c(1,1.5,2),
+                                   main=download_fachbereich[i],annotation_col =my_annot,
+                                   cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                                   clustering_method = "ward.D",fontsize = min(8,floor(240/length(ann_colors$Spezies))), fontsize_col = 5,cutree_cols = beste,silent = T)
+                },error=function(e) NULL)
+              })
+              if(!is.null(download_data[[1]])){
+                einmalig<-unique(as.vector(as.matrix(temp3_2)))
+                einmalig<-einmalig[!is.na(einmalig)]
+                einmalig<-einmalig*2-1
+                
+                print(pheatmap(t(as.matrix(temp3_2)),legend_labels = c("S","I","R")[einmalig],legend_breaks=c(1,1.5,2)[einmalig],
+                         main=download_fachbereich[i],annotation_col =my_annot,breaks=ifelse(length(einmalig)!=1,NA,c(0,3)),
+                         cluster_rows = F,cluster_cols = T,show_colnames = F,annotation_colors=ann_colors,
+                         clustering_method = "ward.D",fontsize = min(8,floor(270/length(ann_colors$Spezies))), fontsize_col = 5,cutree_cols = beste))
+              }else{
+                print(plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                     yaxt="n",bty="n",main=paste0(download_fachbereich[i]," - kein Clustering möglich1"),cex.main=0.8))
+              }
+            }else{
+              print(plot(x=0.5,y=0.5,col="white",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",xaxt="n",
+                   yaxt="n",bty="n",main=paste0(download_fachbereich[i]," - kein Clustering möglich"),cex.main=0.8))
+            }
+            progress$inc(1/length(download_fachbereich))
+          }
+          progress$close()
+        }
+        
+      }
+      
+      graphics.off()
+      
+      shinyjs::html("text", paste0("<br><br>","Cluster-Report erfolgreich generiert","<br>"), add = TRUE)  
+      
+        }
+      
+      )
+      
+    })
+   })
+    
+
+  session$onSessionEnded(function() {
+   # stopApp()
+  })
+})
+
+
+

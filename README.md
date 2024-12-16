@@ -45,9 +45,9 @@ m Analysen mit GEFAAR durchzuführen, muss der Input 1) eingelesen und 2) konfig
 
 ### Beispiel
 
-Wählen Sie die beispielhafte Eingabedatei 'Example/Input/Examplary_input.txt' (für Daten über ein Jahr) oder die Datei 'Example/Input/Exemplary_input_3years.txt' (für Daten über drei aufeinanderfolgende Jahre) und den Separator `Tab`. Führen Sie `Input einlesen` aus.
+Wählen Sie die beispielhafte Input Datei 'Beispiel/Input/Exemplary_input_3years.txt' (für Daten über drei aufeinanderfolgende Jahre) und den Separator `Tab`. Führen Sie `Input einlesen` aus.
 
-Wählen Sie die Spalte 'Spezies' für `...Spezies`, 'Klinik' für `...Klinik/Fachbereich`, 'Material' für `...Material`, 'Date' für `...Datum, 'yyyy-mm-dd' für `-> Datumsformat`, 'Isolat' für `...1. Isolat` und 'Ampicillin' für `...erstes Antibiotikum`. Führen Sie `Input konfigurieren` aus.
+Wählen Sie die Spalte 'Species' für `...Spezies`, 'Clinic' für `...Klinik/Fachbereich`, 'Material' für `...Material`, 'Date' für `...Datum, 'yyyy-mm-dd' für `-> Datumsformat`, 'Isolate' für `...1. Isolat` und 'Amphotericin.B' für `...erstes Antibiotikum`. Führen Sie `Input konfigurieren` aus.
 
 Alternativ wählen Sie `Demo Daten laden` (Daten über drei aufeinanderfolgende Jahre) und führen Sie `Input einlesen` aus.
 

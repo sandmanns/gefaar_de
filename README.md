@@ -186,3 +186,6 @@ Alternativ wählen Sie die Version `Interaktiv`. Behalten Sie die Standardparame
 
 Sollten Sie Fehler bei der Nutzung von GEFAAR feststellen oder sich usätzliche Funktionen wünschen, zögern Sie nicht, ein Issue zu öffnen oder Sarah Sandmann (sarah.sandmann@uni-muenster.de) zu kontaktieren.
 
+## Zitation
+
+Sandmann, S., Schaumburg, F. & Varghese, J. GEFAAR: a generic framework for the analysis of antimicrobial resistance providing statistics and cluster analyses. Sci Rep 13, 16922 (2023). https://doi.org/10.1038/s41598-023-44109-3.

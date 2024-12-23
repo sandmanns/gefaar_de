@@ -18,7 +18,7 @@ Um GEFAAR zu nutzen, benötigen Sie R (Version 4.1.0 oder höher) und R Shiny.
 Um GEFAAR zu installieren, laden Sie einfach das Repository herunter. Alle erforderlichen Pakete werden installiert, alle Funktionen werden automatisch mit Hilfe des global.R-Skripts geladen.
 
 ## GEFAAR ausführen
-GEFAAR ist als R Shiny GUI verfügbar. Um die Software auszuführen: 1) navigieren Sie zu dem Ordner, in dem die folgenden Dateien gespeichert sind: `global.R`, `ui.R`, `server.R`, `www/UKM.png` und `www/white.png. 2) Führen Sie Run App aus.
+GEFAAR ist als R Shiny GUI verfügbar. Um die Software auszuführen: 1) navigieren Sie zu dem Ordner, in dem die folgenden Dateien gespeichert sind: `global.R`, `ui.R`, `server.R`, `www/UKM.png` und `www/white.png`. 2) Führen Sie Run App aus.
 
 ## Beispielhafte Nutzung von GEFAAR
 
@@ -47,7 +47,7 @@ m Analysen mit GEFAAR durchzuführen, muss der Input 1) eingelesen und 2) konfig
 
 Wählen Sie die beispielhafte Input Datei 'Beispiel/Input/Exemplary_input_3years.txt' (für Daten über drei aufeinanderfolgende Jahre) und den Separator `Tab`. Führen Sie `Input einlesen` aus.
 
-Wählen Sie die Spalte 'Species' für `...Spezies`, 'Clinic' für `...Klinik/Fachbereich`, 'Material' für `...Material`, 'Date' für `...Datum, 'yyyy-mm-dd' für `-> Datumsformat`, 'Isolate' für `...1. Isolat` und 'Amphotericin.B' für `...erstes Antibiotikum`. Führen Sie `Input konfigurieren` aus.
+Wählen Sie die Spalte 'Species' für `...Spezies`, 'Clinic' für `...Klinik/Fachbereich`, 'Material' für `...Material`, 'Date' für `...Datum`, 'yyyy-mm-dd' für `-> Datumsformat`, 'Isolate' für `...1. Isolat` und 'Amphotericin.B' für `...erstes Antibiotikum`. Führen Sie `Input konfigurieren` aus.
 
 Alternativ wählen Sie `Demo Daten laden` (Daten über drei aufeinanderfolgende Jahre) und führen Sie `Input einlesen` aus.
 
